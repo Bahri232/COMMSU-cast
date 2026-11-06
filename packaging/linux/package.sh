@@ -34,13 +34,13 @@ export APPIMAGE_EXTRACT_AND_RUN=1                    # no FUSE needed on CI
 export QML_SOURCES_PATHS="$PWD/qml"
 export GSTREAMER_INCLUDE_BAD_PLUGINS=1
 export LINUXDEPLOY_OUTPUT_VERSION="$VERSION"
-export OUTPUT="$OUT/AirShow-linux-x86_64.AppImage"
+export OUTPUT="$OUT/ComSSUCast-linux-x86_64.AppImage"
 
 linuxdeploy-x86_64.AppImage \
   --appdir "$APPDIR" \
-  --executable "$BUILD_DIR/airshow" \
-  --desktop-file packaging/linux/airshow.desktop \
-  --icon-file resources/icons/airshow.png \
+  --executable "$BUILD_DIR/ComSSUCast" \
+  --desktop-file packaging/linux/comssucast.desktop \
+  --icon-file resources/icons/comssu_logo.png \
   --plugin qt --plugin gstreamer \
   --output appimage
 

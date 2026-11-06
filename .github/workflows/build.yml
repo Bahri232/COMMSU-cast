@@ -98,7 +98,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
           QT_QPA_PLATFORM: offscreen
         run: |
-          dist/AirShow-linux-x86_64.AppImage > smoke.log 2>&1 &
+          dist/ComSSUCast-linux-x86_64.AppImage > smoke.log 2>&1 &
           app=$!
           sleep 10
           # The receiver must be discoverable: browse for it over mDNS.
@@ -113,8 +113,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AirShow-linux-x86_64
-          path: dist/AirShow-linux-x86_64.AppImage
+          name: ComSSUCast-linux-x86_64
+          path: dist/ComSSUCast-linux-x86_64.AppImage
 
   macos:
     name: macOS (Homebrew, Apple Silicon)
@@ -146,8 +146,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AirShow-macos-arm64
-          path: dist/AirShow-macos-arm64.dmg
+          name: ComSSUCast-macos-arm64
+          path: dist/ComSSUCast-macos-arm64.dmg
 
   windows:
     name: Windows (MSYS2 UCRT64)
@@ -214,10 +214,17 @@ jobs:
               $log -match 'dnssd_init failed' -or
               -not $mdnsOk) { exit 1 }
 
+      - name: Build Windows Setup Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\installer.iss /Odist
+
       - uses: actions/upload-artifact@v4
         with:
           name: ComSSUCast-windows-x64
-          path: dist/ComSSUCast-windows-x64.zip
+          path: |
+            dist/ComSSUCast-windows-x64.zip
+            dist/ComSSUCast-windows-x64-Setup.exe
 
   release:
     name: Publish release
@@ -233,7 +240,8 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
+            ComSSUCast-windows-x64-Setup.exe
             ComSSUCast-windows-x64.zip
-            AirShow-macos-arm64.dmg
-            AirShow-linux-x86_64.AppImage
+            ComSSUCast-macos-arm64.dmg
+            ComSSUCast-linux-x86_64.AppImage
           generate_release_notes: true

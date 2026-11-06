@@ -8,16 +8,16 @@ set -euo pipefail
 BUILD_DIR=${1:-build}
 OUT=${2:-dist}
 VERSION=${3:-0.0.0}
-APP="$OUT/AirShow.app"
+APP="$OUT/ComSSUCast.app"
 GST_PLUGINS_DIR="$(brew --prefix gstreamer)/lib/gstreamer-1.0"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/PlugIns/gstreamer"
 
-cp "$BUILD_DIR/airshow" "$APP/Contents/MacOS/"
+cp "$BUILD_DIR/ComSSUCast" "$APP/Contents/MacOS/"
 # Data files go in Contents/Resources (codesign rejects non-code in Contents/MacOS).
 cp -R "$BUILD_DIR/resources/" "$APP/Contents/Resources/"
-cp resources/icons/airshow.icns "$APP/Contents/Resources/"
+cp resources/icons/app_icon.icns "$APP/Contents/Resources/"
 sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 
 # GStreamer plugins used by the AirPlay, Cast, DLNA and Miracast pipelines.
@@ -143,6 +143,6 @@ codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
 ARCH=$(uname -m)
-rm -f "$OUT/AirShow-macos-$ARCH.dmg"
-hdiutil create -volname AirShow -srcfolder "$APP" -ov -format UDZO "$OUT/AirShow-macos-$ARCH.dmg" >/dev/null
-echo "Packaged $APP ($(du -sh "$APP" | cut -f1)) and $OUT/AirShow-macos-$ARCH.dmg"
+rm -f "$OUT/ComSSUCast-macos-$ARCH.dmg"
+hdiutil create -volname "ComSSU Cast" -srcfolder "$APP" -ov -format UDZO "$OUT/ComSSUCast-macos-$ARCH.dmg" >/dev/null
+echo "Packaged $APP ($(du -sh "$APP" | cut -f1)) and $OUT/ComSSUCast-macos-$ARCH.dmg"

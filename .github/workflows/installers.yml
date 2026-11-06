@@ -1,0 +1,224 @@
+name: Build & Release Multi-Platform Installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+  push:
+    tags:
+      - 'v*'
+
+env:
+  VERSION: ${{ github.event.inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '1.0.0' }}
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. WINDOWS INSTALLER (Setup .exe & Portable .zip)
+  # ──────────────────────────────────────────────────────────────────────────
+  windows-installer:
+    name: Windows Installer (x64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: zip
+          pacboy: >-
+            toolchain:p cmake:p ninja:p pkgconf:p
+            qt6-base:p qt6-declarative:p qt6-tools:p
+            gstreamer:p gst-plugins-base:p gst-plugins-good:p
+            gst-plugins-bad:p gst-plugins-ugly:p gst-libav:p
+            openssl:p libplist:p protobuf:p gtest:p spdlog:p
+
+      - name: Configure CMake
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build ComSSUCast
+        run: cmake --build build --target ComSSUCast -j4
+
+      - name: Package Windows Bundle
+        run: |
+          packaging/windows/package.sh build dist/ComSSUCast
+          (cd dist && zip -qr ComSSUCast-windows-x64.zip ComSSUCast)
+
+      - name: Compile Inno Setup Windows Installer (.exe)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\installer.iss /Odist
+          if (-not (Test-Path "dist\ComSSUCast-windows-x64-Setup.exe")) {
+              throw "Installer failed to build."
+          }
+
+      - name: Upload Windows Installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComSSUCast-Windows-Installers
+          path: |
+            dist/ComSSUCast-windows-x64-Setup.exe
+            dist/ComSSUCast-windows-x64.zip
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. LINUX INSTALLER (.AppImage & .deb Package)
+  # ──────────────────────────────────────────────────────────────────────────
+  linux-installer:
+    name: Linux Installer (AppImage & Deb)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get remove -y libunwind-14-dev || true
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config file \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+            libavahi-client-dev libavahi-compat-libdnssd-dev \
+            libupnp-dev libplist-dev libssl-dev \
+            libprotobuf-dev protobuf-compiler \
+            libgtest-dev libgmock-dev \
+            libgl1-mesa-dev libxkbcommon-dev libxcb-cursor0
+
+      - name: Install Qt 6.8
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          cache: true
+
+      - name: Configure CMake
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build ComSSUCast
+        run: cmake --build build --target ComSSUCast
+
+      - name: Build Linux AppImage
+        run: packaging/linux/package.sh build dist "$VERSION"
+
+      - name: Build Debian .deb Installer
+        run: |
+          DEB_VER="${VERSION#v}"
+          mkdir -p deb/DEBIAN deb/usr/bin deb/usr/share/applications deb/usr/share/icons/hicolor/256x256/apps
+          cp dist/ComSSUCast-linux-x86_64.AppImage deb/usr/bin/comssucast
+          chmod +x deb/usr/bin/comssucast
+          cp packaging/linux/comssucast.desktop deb/usr/share/applications/
+          cp resources/icons/comssu_logo.png deb/usr/share/icons/hicolor/256x256/apps/comssu_logo.png
+          cat > deb/DEBIAN/control <<EOF
+          Package: comssucast
+          Version: ${DEB_VER}
+          Section: video
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Abdul Malik Barrie (BAHRI) <abdulmalikbarrie@gmail.com>
+          Description: ComSSU Wireless Display System
+           Cross-platform wireless screen projection (AirPlay, Miracast, Google Cast)
+           engineered for interactive flat panels. University of Makeni (UniMak).
+          EOF
+          dpkg-deb --build deb "dist/comssucast_${DEB_VER}_amd64.deb"
+
+      - name: Upload Linux Installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComSSUCast-Linux-Installers
+          path: |
+            dist/ComSSUCast-linux-x86_64.AppImage
+            dist/comssucast_*_amd64.deb
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. MACOS INSTALLER (.dmg Disk Image)
+  # ──────────────────────────────────────────────────────────────────────────
+  macos-installer:
+    name: macOS Installer (Apple Silicon DMG)
+    runs-on: macos-15
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: brew install ninja pkgconf qt gstreamer protobuf googletest libplist libupnp spdlog
+
+      - name: Configure CMake
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix)"
+
+      - name: Build ComSSUCast
+        run: cmake --build build --target ComSSUCast
+
+      - name: Package macOS DMG
+        run: packaging/macos/package.sh build dist "${VERSION#v}"
+
+      - name: Upload macOS Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ComSSUCast-macOS-Installers
+          path: dist/ComSSUCast-macos-*.dmg
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. RELEASE & DEPLOYMENT (Publishes to GitHub Releases when tagged)
+  # ──────────────────────────────────────────────────────────────────────────
+  release:
+    name: Publish Release Packages
+    needs: [windows-installer, linux-installer, macos-installer]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download All Platform Installers
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release-artifacts
+
+      - name: List Artifacts
+        run: ls -la release-artifacts/
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', env.VERSION) }}
+          name: ComSSU Wireless Display System v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            release-artifacts/ComSSUCast-windows-x64-Setup.exe
+            release-artifacts/ComSSUCast-windows-x64.zip
+            release-artifacts/ComSSUCast-linux-x86_64.AppImage
+            release-artifacts/comssucast_*_amd64.deb
+            release-artifacts/ComSSUCast-macos-*.dmg
+          body: |
+            ## ComSSU — Wireless Display System (v${{ env.VERSION }})
+            **Computer Science Students' Society (ComSSU) — University of Makeni (UniMak)**
+            **2026/27 Academic Year** | **Lead Developer: Abdul Malik Barrie (BAHRI)**
+
+            ### Available Multi-Platform Installers:
+            - **Windows (10/11 x64)**:
+              - [Setup Installer (Recommended)] `ComSSUCast-windows-x64-Setup.exe`
+              - [Portable Zip Package] `ComSSUCast-windows-x64.zip`
+            - **Linux (x86_64)**:
+              - [Universal AppImage] `ComSSUCast-linux-x86_64.AppImage`
+              - [Debian/Ubuntu Package] `comssucast_amd64.deb`
+            - **macOS (Apple Silicon)**:
+              - [Disk Image Installer] `ComSSUCast-macos-arm64.dmg`
+          generate_release_notes: true

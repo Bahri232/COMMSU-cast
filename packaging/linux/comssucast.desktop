@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ComSSU Cast
+GenericName=Wireless Display System
+Comment=Cross-platform wireless screen projection (AirPlay, Miracast, Google Cast) for interactive displays
+Exec=ComSSUCast
+Icon=comssu_logo
+Categories=AudioVideo;Video;Network;
+Terminal=false
