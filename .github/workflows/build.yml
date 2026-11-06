@@ -87,7 +87,7 @@ jobs:
       - name: Build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target airshow
+          cmake --build build --target ComSSUCast
 
       - name: Package
         run: packaging/linux/package.sh build dist "$VERSION"
@@ -187,8 +187,8 @@ jobs:
 
       - name: Package
         run: |
-          packaging/windows/package.sh build dist/AirShow
-          (cd dist && zip -qr AirShow-windows-x64.zip AirShow)
+          packaging/windows/package.sh build dist/ComSSUCast
+          (cd dist && zip -qr ComSSUCast-windows-x64.zip ComSSUCast)
 
       - name: Smoke test package
         # Run from the zip's folder with MSYS2 off PATH: the app must start and
@@ -200,7 +200,7 @@ jobs:
           $python = (Get-Command python).Source
           $env:PATH = "C:\Windows\System32;C:\Windows"
           $env:QT_FORCE_STDERR_LOGGING = "1"
-          $p = Start-Process dist\AirShow\airshow.exe -ArgumentList '--windowed' -PassThru `
+          $p = Start-Process dist\ComSSUCast\ComSSUCast.exe -ArgumentList '--windowed' -PassThru `
                  -RedirectStandardOutput smoke-out.log -RedirectStandardError smoke-err.log
           Start-Sleep -Seconds 12
           & $python -I tests/tools/mdns_query.py _airplay._tcp 15
@@ -216,8 +216,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AirShow-windows-x64
-          path: dist/AirShow-windows-x64.zip
+          name: ComSSUCast-windows-x64
+          path: dist/ComSSUCast-windows-x64.zip
 
   release:
     name: Publish release
@@ -233,7 +233,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            AirShow-windows-x64.zip
+            ComSSUCast-windows-x64.zip
             AirShow-macos-arm64.dmg
             AirShow-linux-x86_64.AppImage
           generate_release_notes: true
