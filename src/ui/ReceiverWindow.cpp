@@ -35,8 +35,8 @@ bool ReceiverWindow::load() {
     auto* settingsBridge = new SettingsBridge(m_settings, &m_engine);
     m_engine.rootContext()->setContextProperty("appSettings", settingsBridge);
 
-    // Load QML (GstGLQt6VideoItem is now registered, all context properties set)
-    m_engine.load(QUrl(QStringLiteral("qrc:/qt/qml/AirShow/qml/main.qml")));
+    // Load QML
+    m_engine.load(QUrl(QStringLiteral("qrc:/qt/qml/ComSSUCast/qml/main.qml")));
 
     if (m_engine.rootObjects().isEmpty()) {
         qWarning("ReceiverWindow::load — QML engine failed to load main.qml");
@@ -49,6 +49,11 @@ bool ReceiverWindow::load() {
     QObject* rootObject = m_engine.rootObjects().first();
     auto* window = qobject_cast<QQuickWindow*>(rootObject);
     if (window) {
+        // Enforce Fullscreen Kiosk Mode for 85" interactive displays unless --windowed is passed
+        if (!QCoreApplication::arguments().contains(QStringLiteral("--windowed"))) {
+            window->showFullScreen();
+        }
+
         QObject::connect(window, &QQuickWindow::sceneGraphInitialized,
                          [this, rootObject]() {
             if (m_pipelineInitialized) return;

@@ -144,10 +144,13 @@ int main(int argc, char* argv[]) {
     checkRequiredPlugins();
 
     // Set organization/app name so QSettings uses correct native path
-    QCoreApplication::setOrganizationName("AirShow");
-    QCoreApplication::setApplicationName("AirShow");
+    QCoreApplication::setOrganizationName("ComSSU - University of Makeni");
+    QCoreApplication::setOrganizationDomain("unimak.edu.sl");
+    QCoreApplication::setApplicationName("ComSSUCast");
+    QCoreApplication::setApplicationVersion("1.0.0");
 
     QGuiApplication app(argc, argv);
+    app.setApplicationDisplayName("ComSSU — Wireless Display System");
 
     airshow::AppSettings settings;
 
@@ -193,7 +196,7 @@ int main(int argc, char* argv[]) {
     pipeline.setQmlVideoItem(nullptr);  // will be overridden by ReceiverWindow after QML loads
 
     if (!window.load()) {
-        qCritical("Failed to start AirShow");
+        qCritical("Failed to start ComSSU Cast");
         return 1;
     }
 

@@ -322,7 +322,7 @@ QByteArray WebInterface::buildLandingPage() const {
         </div>
 
         <div class="footer">
-            AirShow &mdash; Free, open-source screen mirroring for everyone
+            ComSSU Cast &mdash; Computer Science Students' Society (ComSSU) | University of Makeni
         </div>
     </div>
 </body>

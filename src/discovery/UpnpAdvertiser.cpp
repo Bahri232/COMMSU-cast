@@ -307,6 +307,8 @@ std::string UpnpAdvertiser::writeRuntimeXml(const std::string& receiverName,
             pos += to.size();
         }
     };
+    replaceAll(xml, "<friendlyName>CS Society Display</friendlyName>",
+                    "<friendlyName>" + receiverName + "</friendlyName>");
     replaceAll(xml, "<friendlyName>AirShow</friendlyName>",
                     "<friendlyName>" + receiverName + "</friendlyName>");
     replaceAll(xml, "<UDN>uuid:00000000-0000-0000-0000-000000000000</UDN>",

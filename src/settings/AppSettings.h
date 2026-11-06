@@ -48,6 +48,9 @@ public:
     QString pin() const;
     void setPin(const QString& v);
 
+    // Generate a fresh random 4-digit PIN (1000-9999) and store it
+    QString generateNewPin();
+
     // List of stable device identifiers that have been approved for connection
     // without re-prompting (MAC for AirPlay, UUID for Cast, IP+UA for DLNA).
     // Key: "security/trustedDevices"

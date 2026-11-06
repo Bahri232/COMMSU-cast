@@ -1,6 +1,7 @@
 #include "settings/AppSettings.h"
 #include <QSettings>
 #include <QSysInfo>
+#include <QRandomGenerator>
 
 namespace airshow {
 
@@ -12,7 +13,11 @@ AppSettings::AppSettings() = default;
 
 QString AppSettings::receiverName() const {
     QSettings s;
-    return s.value(QStringLiteral("receiver/name"), defaultReceiverName()).toString();
+    QString name = s.value(QStringLiteral("receiver/name"), defaultReceiverName()).toString();
+    if (name.isEmpty() || name == QStringLiteral("AirShow")) {
+        return defaultReceiverName();
+    }
+    return name;
 }
 
 void AppSettings::setReceiverName(const QString& name) {
@@ -33,8 +38,7 @@ void AppSettings::setFirstLaunchComplete() {
 }
 
 QString AppSettings::defaultReceiverName() {
-    QString host = QSysInfo::machineHostName();
-    return host.isEmpty() ? QStringLiteral("AirShow") : host;
+    return QStringLiteral("CS Society Display");
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +58,7 @@ void AppSettings::setRequireApproval(bool v) {
 
 bool AppSettings::pinEnabled() const {
     QSettings s;
-    return s.value(QStringLiteral("security/pinEnabled"), false).toBool();
+    return s.value(QStringLiteral("security/pinEnabled"), true).toBool();
 }
 
 void AppSettings::setPinEnabled(bool v) {
@@ -65,13 +69,24 @@ void AppSettings::setPinEnabled(bool v) {
 
 QString AppSettings::pin() const {
     QSettings s;
-    return s.value(QStringLiteral("security/pin"), QString()).toString();
+    QString currentPin = s.value(QStringLiteral("security/pin"), QString()).toString();
+    if (currentPin.length() != 4) {
+        currentPin = const_cast<AppSettings*>(this)->generateNewPin();
+    }
+    return currentPin;
 }
 
 void AppSettings::setPin(const QString& v) {
     QSettings s;
     s.setValue(QStringLiteral("security/pin"), v);
     s.sync();
+}
+
+QString AppSettings::generateNewPin() {
+    int randomVal = QRandomGenerator::global()->bounded(1000, 10000);
+    QString newPin = QString::number(randomVal);
+    setPin(newPin);
+    return newPin;
 }
 
 QStringList AppSettings::trustedDevices() const {

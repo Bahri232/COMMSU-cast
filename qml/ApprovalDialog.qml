@@ -1,109 +1,188 @@
 import QtQuick
+import QtQuick.Controls
 
-// ApprovalDialog — modal approval overlay for incoming connection requests.
-//
-// D-01 / SEC-01: Appears when connectionBridge.approvalPending is true.
-// D-13: Full-screen MouseArea blocks input to underlying content when visible.
-// Follows the established HudOverlay pattern:
-//   - visible: opacity > 0 (prevents mouse-event blocking at opacity 0, RESEARCH.md Pitfall 3)
-//   - Behavior on opacity { NumberAnimation { duration: 150 } }
-//   - Dark semi-transparent background matching HudOverlay aesthetic
 Item {
     id: approvalDialog
     anchors.fill: parent
 
-    // CRITICAL: use opacity > 0, not approvalPending directly
-    // Prevents mouse-event blocking when faded out (RESEARCH.md Pitfall 3)
     visible: opacity > 0
     opacity: connectionBridge.approvalPending ? 1.0 : 0.0
 
-    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-    // Full-screen semi-transparent backdrop — dims the content behind the dialog
-    Rectangle {
-        anchors.fill: parent
-        color: "#80000000"
+    Behavior on opacity {
+        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
     }
 
-    // Full-screen MouseArea — blocks all input to underlying content when dialog is visible.
-    // acceptedButtons: Qt.AllButtons ensures no click passes through (D-13).
-    MouseArea {
+    // Modal background overlay
+    Rectangle {
         anchors.fill: parent
-        acceptedButtons: Qt.AllButtons
-        // Consume events — do not propagate to content below
+        color: "#B3030712"
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+        }
     }
 
-    // Centered dialog card
+    // Centered Dialog Card (Optimized for 85" interactive display touch)
     Rectangle {
-        id: dialogCard
+        id: card
+        width: Math.min(600, parent.width - 48)
+        height: Math.min(380, parent.height - 48)
         anchors.centerIn: parent
-        width: 420
-        height: 220
-        radius: 12
-        color: "#CC1A1A2E"
+        radius: 18
+        color: "#0F1A2E"
+        border.color: "#00A8E8"
+        border.width: 2
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+        }
 
         Column {
             anchors.centerIn: parent
-            spacing: 12
-            width: parent.width - 48
+            width: parent.width - 56
+            spacing: 16
 
-            // Title
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "Connection Request"
-                color: "white"
-                font.pixelSize: 20
-                font.bold: true
-                font.family: "sans-serif"
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            // Device name + protocol
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: connectionBridge.pendingDeviceName + " (" + connectionBridge.pendingProtocol + ")"
-                color: "white"
-                font.pixelSize: 16
-                font.family: "sans-serif"
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideMiddle
-                width: parent.width
-            }
-
-            // Subtitle
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "wants to connect to this display"
-                color: "#BBBBBB"
-                font.pixelSize: 14
-                font.family: "sans-serif"
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            // Allow / Deny buttons
+            // Header Row: Shield Icon & Title
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 16
+                spacing: 12
+                Text {
+                    text: "\uD83D\uDEE1\uFE0F" // 🛡️
+                    font.pixelSize: 28
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: "Incoming Connection Request"
+                    color: "#FFFFFF"
+                    font.pixelSize: 22
+                    font.bold: true
+                    font.family: "sans-serif"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
 
-                // Allow button
-                Item {
-                    id: allowButton
-                    width: 130
-                    height: 40
+            // Device Name & Protocol Card
+            Rectangle {
+                width: parent.width
+                height: 72
+                radius: 12
+                color: "#16253D"
+                border.color: "#22395D"
+                border.width: 1
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 6
-                        color: allowMouse.containsMouse ? "#55CC55" : "#44AA44"
-                    }
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 12
 
                     Text {
+                        text: {
+                            var proto = connectionBridge.pendingProtocol
+                            if (proto === "AirPlay") return "\uD83C\uDF4E"
+                            if (proto === "Cast") return "\uD83D\uDCFA"
+                            if (proto === "Miracast") return "\uD83D\uDCBB"
+                            return "\uD83D\uDCF1"
+                        }
+                        font.pixelSize: 28
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+
+                        Text {
+                            text: connectionBridge.pendingDeviceName.length > 0
+                                  ? connectionBridge.pendingDeviceName
+                                  : "Unknown Device"
+                            color: "#FFFFFF"
+                            font.pixelSize: 19
+                            font.bold: true
+                            font.family: "sans-serif"
+                        }
+
+                        Text {
+                            text: "Protocol: " + connectionBridge.pendingProtocol
+                            color: "#38BDF8"
+                            font.pixelSize: 13
+                            font.bold: true
+                            font.family: "sans-serif"
+                        }
+                    }
+                }
+            }
+
+            // PIN Reference Badge alongside request prompt
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 10
+
+                Text {
+                    text: "Security PIN:"
+                    color: "#94A3B8"
+                    font.pixelSize: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Rectangle {
+                    width: pinText.width + 16
+                    height: 28
+                    radius: 6
+                    color: "#0B1322"
+                    border.color: "#00A8E8"
+                    border.width: 1
+
+                    Text {
+                        id: pinText
                         anchors.centerIn: parent
-                        text: "Allow"
-                        color: "white"
-                        font.pixelSize: 16
+                        text: appSettings.pin
+                        color: "#38BDF8"
+                        font.pixelSize: 15
                         font.bold: true
-                        font.family: "sans-serif"
+                        font.letterSpacing: 3
+                    }
+                }
+
+                Text {
+                    text: "• Allow projection to interactive screen?"
+                    color: "#CBD5E1"
+                    font.pixelSize: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            Item { width: 1; height: 6 }
+
+            // Large Touch-Friendly Action Buttons
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 20
+
+                // Allow Button
+                Rectangle {
+                    id: allowBtn
+                    width: 200
+                    height: 56
+                    radius: 12
+                    color: allowMouse.containsMouse ? "#059669" : "#10B981"
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 8
+                        Text {
+                            text: "\u2714" // ✔
+                            color: "white"
+                            font.pixelSize: 18
+                            font.bold: true
+                        }
+                        Text {
+                            text: "Allow Screen"
+                            color: "white"
+                            font.pixelSize: 17
+                            font.bold: true
+                            font.family: "sans-serif"
+                        }
                     }
 
                     MouseArea {
@@ -118,25 +197,30 @@ Item {
                     }
                 }
 
-                // Deny button
-                Item {
-                    id: denyButton
-                    width: 130
-                    height: 40
+                // Deny Button
+                Rectangle {
+                    id: denyBtn
+                    width: 160
+                    height: 56
+                    radius: 12
+                    color: denyMouse.containsMouse ? "#DC2626" : "#EF4444"
 
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 6
-                        color: denyMouse.containsMouse ? "#CC5555" : "#AA4444"
-                    }
-
-                    Text {
+                    Row {
                         anchors.centerIn: parent
-                        text: "Deny"
-                        color: "white"
-                        font.pixelSize: 16
-                        font.bold: true
-                        font.family: "sans-serif"
+                        spacing: 8
+                        Text {
+                            text: "\u2716" // ✖
+                            color: "white"
+                            font.pixelSize: 16
+                            font.bold: true
+                        }
+                        Text {
+                            text: "Deny"
+                            color: "white"
+                            font.pixelSize: 17
+                            font.bold: true
+                            font.family: "sans-serif"
+                        }
                     }
 
                     MouseArea {

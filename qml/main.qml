@@ -1,52 +1,53 @@
 import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
-import AirShow 1.0
+import ComSSUCast 1.0
 
 Window {
     id: root
-    // D-10: Application launches fullscreen by default on the primary display.
-    // Pass --windowed on the command line to run in a normal window instead.
+
+    // Launches fullscreen by default on 85" 4K interactive flat panel displays
     visibility: Qt.application.arguments.indexOf("--windowed") !== -1
                 ? Window.Windowed : Window.FullScreen
-    width: 1280
-    height: 720
-    color: "black"
-    title: "AirShow"
+    width: 1920
+    height: 1080
+    color: "#050A14"
+    title: "ComSSU — Wireless Display System"
     visible: true
 
-    // VideoFrameSink receives RGBA frames from GStreamer's appsink and renders
-    // them via Qt's scene graph (QSGSimpleTextureNode). Replaces GstGLQt6VideoItem
-    // to avoid GStreamer GL context sharing and buffer pool deadlock issues.
-    // objectName must match ReceiverWindow.cpp findChild("videoItem") call.
+    // VideoFrameSink receives RGBA frames from GStreamer appsink
     VideoFrameSink {
         id: videoItem
         objectName: "videoItem"
         anchors.fill: parent
-        forceAspectRatio: true   // D-01: letterbox — preserve aspect ratio, never stretch
+        forceAspectRatio: true
     }
 
-    // DISP-03: Idle/waiting screen — visible when no device is connected.
-    // Renders on top of the video item (black video when no stream = seamless).
+    // Idle / Welcome screen — visible when no sender device is streaming
     IdleScreen {
+        id: idleScreenView
         anchors.fill: parent
+        onRequestAbout: aboutDialog.open()
     }
 
-    // DISP-02: Connection status HUD — fades in on connect/disconnect, auto-hides after 3s.
-    // Renders on top of the idle screen (appears during transition from idle to active).
+    // Connection status HUD pill overlay
     HudOverlay {
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
     }
 
-    // SEC-01: Approval dialog overlay — appears on top of everything when a new device
-    // requests to connect and requireApproval is enabled. Must be the last child so
-    // it renders above all other overlays (HudOverlay, mute button, close button).
+    // Interactive Authorization Dialog (Allow / Deny incoming devices)
     ApprovalDialog {
         anchors.fill: parent
     }
 
-    // Track mouse movement to show/hide controls overlay
+    // Dedicated About Dialog Modal
+    AboutDialog {
+        id: aboutDialog
+        anchors.fill: parent
+    }
+
+    // Touch & Mouse tracker for hover controls
     MouseArea {
         id: mouseTracker
         anchors.fill: parent
@@ -54,51 +55,84 @@ Window {
         acceptedButtons: Qt.NoButton
         propagateComposedEvents: true
 
-        property bool controlsVisible: false
+        property bool controlsHovered: false
 
         onPositionChanged: {
-            controlsVisible = true
+            controlsHovered = true
             hideTimer.restart()
         }
 
         Timer {
             id: hideTimer
-            interval: 3000
-            onTriggered: mouseTracker.controlsVisible = false
+            interval: 4000
+            onTriggered: mouseTracker.controlsHovered = false
         }
     }
 
-    // Top-right button row — fullscreen toggle + close button
+    // Top-Right Quick Action Button Row (Touch-friendly for 85" Flat Panels)
     Row {
         anchors {
             top: parent.top
             right: parent.right
-            topMargin: 16
-            rightMargin: 16
+            topMargin: 20
+            rightMargin: 20
         }
-        spacing: 8
-        opacity: mouseTracker.controlsVisible ? 0.9 : 0
-        visible: opacity > 0
+        spacing: 12
+        // Always maintain subtle visibility on touchscreen kiosk displays (opacity 0.4 at rest, 1.0 on active touch/hover)
+        opacity: (mouseTracker.controlsHovered || !connectionBridge.connected) ? 0.95 : 0.4
 
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
-        // Fullscreen toggle button
+        // About Button (ℹ️)
         Item {
-            id: fullscreenButton
-            width: 40
-            height: 40
+            id: aboutIconBtn
+            width: 48
+            height: 48
 
             Rectangle {
                 anchors.fill: parent
-                color: fsMouseArea.containsMouse ? "#E0AAAAFF" : "#B3000000"
-                radius: 20
+                color: aboutMouse.containsMouse ? "#00A8E8" : "#B30A1426"
+                border.color: "#00A8E8"
+                border.width: 1
+                radius: 24
+            }
+
+            Text {
+                anchors.centerIn: parent
+                text: "\u2139\uFE0F" // ℹ️
+                color: "white"
+                font.pixelSize: 18
+                font.family: "sans-serif"
+            }
+
+            MouseArea {
+                id: aboutMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: aboutDialog.open()
+            }
+        }
+
+        // Fullscreen Toggle Button (⛶)
+        Item {
+            id: fullscreenButton
+            width: 48
+            height: 48
+
+            Rectangle {
+                anchors.fill: parent
+                color: fsMouseArea.containsMouse ? "#00A8E8" : "#B30A1426"
+                border.color: "#1E3A5F"
+                border.width: 1
+                radius: 24
             }
 
             Text {
                 anchors.centerIn: parent
                 text: "\u26F6"
                 color: "white"
-                font.pixelSize: 20
+                font.pixelSize: 22
                 font.family: "sans-serif"
             }
 
@@ -115,21 +149,23 @@ Window {
             }
         }
 
-        // Close button
+        // Close / Exit Application Button (✕)
         Item {
             id: closeButton
-            width: 40
-            height: 40
+            width: 48
+            height: 48
 
             Rectangle {
                 anchors.fill: parent
-                color: closeMouseArea.containsMouse ? "#E0FF4444" : "#B3000000"
-                radius: 20
+                color: closeMouseArea.containsMouse ? "#EF4444" : "#B30A1426"
+                border.color: "#EF4444"
+                border.width: 1
+                radius: 24
             }
 
             Text {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: 2
+                anchors.verticalCenterOffset: 1
                 text: "\u2715"
                 color: "white"
                 font.pixelSize: 20
@@ -146,40 +182,51 @@ Window {
         }
     }
 
-    // Mute toggle button — D-08 / FOUND-04
-    // Styled to match overlay aesthetic (D-15): dark semi-transparent background, white text.
-    // Wires to AudioBridge QObject exposed as audioBridge context property.
+    // Touch-Friendly Audio Mute / Unmute Button (Active during streams)
     Item {
         id: muteButton
         anchors {
             bottom: parent.bottom
             horizontalCenter: parent.horizontalCenter
-            bottomMargin: 24
+            bottomMargin: 28
         }
-        width: muteLabel.width + 32
-        height: muteLabel.height + 16
-        opacity: mouseTracker.controlsVisible ? 0.8 : 0
-        visible: opacity > 0
+        width: muteLabel.width + 36
+        height: 48
+        visible: connectionBridge.connected && (mouseTracker.controlsHovered || opacity > 0)
+        opacity: mouseTracker.controlsHovered ? 0.95 : 0.0
 
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
         Rectangle {
             anchors.fill: parent
-            color: "#B3000000"
-            radius: 6
+            color: "#CC0F1A2E"
+            border.color: "#00A8E8"
+            border.width: 1
+            radius: 24
         }
 
-        Text {
-            id: muteLabel
+        Row {
             anchors.centerIn: parent
-            text: audioBridge.muted ? "Unmute" : "Mute"
-            color: "white"
-            font.pixelSize: 16
-            font.family: "sans-serif"
+            spacing: 8
+            Text {
+                text: audioBridge.muted ? "\uD83D\uDD07" : "\uD83D\uDD0A"
+                font.pixelSize: 18
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                id: muteLabel
+                text: audioBridge.muted ? "Unmute Audio" : "Mute Audio"
+                color: "white"
+                font.pixelSize: 16
+                font.bold: true
+                font.family: "sans-serif"
+                anchors.verticalCenter: parent.verticalCenter
+            }
         }
 
         MouseArea {
             anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
             onClicked: audioBridge.setMuted(!audioBridge.muted)
         }
     }

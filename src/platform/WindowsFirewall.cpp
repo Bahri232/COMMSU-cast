@@ -62,12 +62,12 @@ bool WindowsFirewall::registerRules() {
     INetFwRules* pRules = nullptr;
     pPolicy->get_Rules(&pRules);
 
-    addRule(pRules, L"AirShow mDNS",     NET_FW_IP_PROTOCOL_UDP, L"5353");
-    addRule(pRules, L"AirShow SSDP",     NET_FW_IP_PROTOCOL_UDP, L"1900");
-    addRule(pRules, L"AirShow AirPlay",  NET_FW_IP_PROTOCOL_TCP, L"7000");
-    addRule(pRules, L"AirShow Cast",     NET_FW_IP_PROTOCOL_TCP, L"8009");
-    addRule(pRules, L"AirShow Protocol", NET_FW_IP_PROTOCOL_TCP, L"7400");
-    addRule(pRules, L"AirShow Web",      NET_FW_IP_PROTOCOL_TCP, L"7401");
+    addRule(pRules, L"ComSSUCast mDNS",     NET_FW_IP_PROTOCOL_UDP, L"5353");
+    addRule(pRules, L"ComSSUCast SSDP",     NET_FW_IP_PROTOCOL_UDP, L"1900");
+    addRule(pRules, L"ComSSUCast AirPlay",  NET_FW_IP_PROTOCOL_TCP, L"7000");
+    addRule(pRules, L"ComSSUCast Cast",     NET_FW_IP_PROTOCOL_TCP, L"8009");
+    addRule(pRules, L"ComSSUCast Protocol", NET_FW_IP_PROTOCOL_TCP, L"7400");
+    addRule(pRules, L"ComSSUCast Web",      NET_FW_IP_PROTOCOL_TCP, L"7401");
 
     if (pRules)  pRules->Release();
     if (pPolicy) pPolicy->Release();

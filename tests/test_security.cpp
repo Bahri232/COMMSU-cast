@@ -115,12 +115,12 @@ TEST_F(AppSettingsPinTest, RequireApprovalDefault) {
 
 TEST_F(AppSettingsPinTest, PinEnabledDefault) {
     airshow::AppSettings s;
-    EXPECT_FALSE(s.pinEnabled());
+    EXPECT_TRUE(s.pinEnabled());
 }
 
 TEST_F(AppSettingsPinTest, PinDefault) {
     airshow::AppSettings s;
-    EXPECT_EQ(s.pin(), QString());
+    EXPECT_EQ(s.pin().length(), 4);
 }
 
 TEST_F(AppSettingsPinTest, TrustedDevicesDefault) {

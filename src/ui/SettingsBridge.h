@@ -67,6 +67,9 @@ public:
     // Clears the trusted device list and emits trustedDevicesChanged.
     Q_INVOKABLE void clearTrustedDevices();
 
+    // Generates a new 4-digit PIN, stores it, and emits pinChanged
+    Q_INVOKABLE QString generateNewPin();
+
 signals:
     void receiverNameChanged(const QString& receiverName);
 

@@ -6,11 +6,11 @@
   </specVersion>
   <device>
     <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
-    <friendlyName>AirShow</friendlyName>
-    <manufacturer>AirShow Project</manufacturer>
-    <manufacturerURL>https://github.com/airshow</manufacturerURL>
-    <modelDescription>Multi-protocol screen mirroring receiver</modelDescription>
-    <modelName>AirShow</modelName>
+    <friendlyName>CS Society Display</friendlyName>
+    <manufacturer>Computer Science Students' Society (ComSSU) - UniMak</manufacturer>
+    <manufacturerURL>https://unimak.edu.sl</manufacturerURL>
+    <modelDescription>ComSSU Wireless Display System</modelDescription>
+    <modelName>ComSSU Cast</modelName>
     <modelNumber>1.0</modelNumber>
     <UDN>uuid:00000000-0000-0000-0000-000000000000</UDN>
     <serviceList>

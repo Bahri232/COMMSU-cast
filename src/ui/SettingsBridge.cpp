@@ -60,4 +60,10 @@ void SettingsBridge::clearTrustedDevices() {
     emit trustedDevicesChanged(QStringList());
 }
 
+QString SettingsBridge::generateNewPin() {
+    QString newPin = m_settings.generateNewPin();
+    emit pinChanged(newPin);
+    return newPin;
+}
+
 } // namespace airshow

@@ -184,7 +184,7 @@ bool AirPlayHandler::start() {
         std::string hwAddr;
         for (int i = 0; i < macLen; ++i) hwAddr.push_back(static_cast<char>(mac[i]));
         const std::string name = m_discoveryManager ? m_discoveryManager->receiverName()
-                                                    : std::string("AirShow");
+                                                    : std::string("CS Society Display");
 
         int dnssd_err = 0;
         dnssd_t* dnssd = dnssd_init(name.c_str(),

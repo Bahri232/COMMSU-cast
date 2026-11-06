@@ -58,7 +58,7 @@ std::string defaultHostLabel() {
         if (label.size() >= 40) break;
     }
     while (!label.empty() && label.back() == '-') label.pop_back();
-    return label.empty() ? "AirShow" : label + "-AirShow";
+    return label.empty() ? "ComSSUCast" : label + "-ComSSUCast";
 }
 
 bool isUnique(const dns::Record& r) { return r.type != dns::kPtr; }
@@ -237,7 +237,7 @@ private:
 
     static std::string instanceLabel(const Service& s) {
         const std::string suffix = s.suffix == 1 ? "" : " (" + std::to_string(s.suffix) + ")";
-        const std::string base = s.baseName.empty() ? "AirShow" : s.baseName;
+        const std::string base = s.baseName.empty() ? "CS Society Display" : s.baseName;
         return fitUtf8(base, dns::kMaxLabel - suffix.size()) + suffix;
     }
 

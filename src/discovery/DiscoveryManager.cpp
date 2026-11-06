@@ -101,7 +101,7 @@ bool DiscoveryManager::start() {
     std::vector<TxtRecord> castTxt = {
         {"id", castIdNoHyphens},
         {"ve", "05"},
-        {"md", "AirShow"},
+        {"md", "ComSSUCast"},
         {"fn", name},
         {"ic", "/icon.png"},
         {"ca", "4101"},  // 0x1005 = VIDEO_OUT|AUDIO_OUT|CAST_PROTOCOL_V2 — required for Chrome to list device

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(AirShow LANGUAGES CXX C)  # C required for UxPlay lib/ C sources
+project(ComSSUCast VERSION 1.0.0 LANGUAGES CXX C)  # C required for UxPlay lib/ C sources
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -122,8 +122,15 @@ set_property(TARGET airplay PROPERTY SOURCES ${_airplay_srcs})
 target_sources(airplay PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/airplay/airshow_dnssd.c)
 target_include_directories(airplay PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor/uxplay/lib)
 
+# Windows Resource file
+set(APP_RC_SRC "")
+if(WIN32)
+  set(APP_RC_SRC ComSSUCast.rc)
+endif()
+
 # Main executable
-qt_add_executable(airshow
+qt_add_executable(ComSSUCast
+  ${APP_RC_SRC}
   src/main.cpp
   src/pipeline/MediaPipeline.cpp
   src/ui/ReceiverWindow.cpp
@@ -156,21 +163,33 @@ qt_add_executable(airshow
 
 # QML lives under Qt's standard :/qt/qml/ resource prefix (on the default import
 # path, so the binary doesn't depend on a qmldir next to it), and the module's
-# build output goes to qml/AirShow — a top-level AirShow/ dir would collide with
-# the airshow executable on case-insensitive filesystems (macOS, Windows).
+# build output goes to qml/ComSSUCast — avoiding collide on case-insensitive filesystems.
 qt_policy(SET QTP0001 NEW)
-qt_add_qml_module(airshow
-  URI AirShow
+qt_add_qml_module(ComSSUCast
+  URI ComSSUCast
   VERSION 1.0
-  OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/AirShow
+  OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml/ComSSUCast
   QML_FILES
     qml/main.qml
     qml/HudOverlay.qml
     qml/IdleScreen.qml
     qml/ApprovalDialog.qml
+    qml/AboutDialog.qml
+  RESOURCES
+    assets/comssu_logo.png
+    resources/icons/comssu_logo.png
+    resources/icons/app_icon.ico
 )
 
-target_include_directories(airshow PRIVATE
+# Application resource bundle for standard root resource paths
+qt_add_resources(ComSSUCast "app_assets"
+  PREFIX "/"
+  FILES
+    assets/comssu_logo.png
+    resources/icons/app_icon.ico
+)
+
+target_include_directories(ComSSUCast PRIVATE
   src
   src/ui   # Required for QML_ELEMENT auto-generated type registrations to find VideoFrameSink.h
   vendor/uxplay/lib
@@ -178,7 +197,7 @@ target_include_directories(airshow PRIVATE
   ${Protobuf_INCLUDE_DIRS}
 )
 
-target_link_libraries(airshow PRIVATE
+target_link_libraries(ComSSUCast PRIVATE
   Qt6::Core
   Qt6::Gui
   Qt6::Quick
@@ -193,25 +212,24 @@ target_link_libraries(airshow PRIVATE
   protobuf::libprotobuf
 )
 
-
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_link_libraries(airshow PRIVATE PkgConfig::AVAHI)
+  target_link_libraries(ComSSUCast PRIVATE PkgConfig::AVAHI)
 endif()
 
 # Windows: iphlpapi for MAC address, ws2_32 for sockets.
 # dnssd.dll is loaded at runtime (no Bonjour SDK needed to build).
 if(WIN32)
-  target_link_libraries(airshow PRIVATE iphlpapi ws2_32)
+  target_link_libraries(ComSSUCast PRIVATE iphlpapi ws2_32)
 endif()
 
 # macOS: dns_sd is part of the system framework
 if(APPLE)
-  target_link_libraries(airshow PRIVATE "-framework CoreFoundation" "-framework SystemConfiguration")
+  target_link_libraries(ComSSUCast PRIVATE "-framework CoreFoundation" "-framework SystemConfiguration")
 endif()
 
 if(spdlog_FOUND)
-  target_link_libraries(airshow PRIVATE spdlog::spdlog)
-  target_compile_definitions(airshow PRIVATE HAVE_SPDLOG)
+  target_link_libraries(ComSSUCast PRIVATE spdlog::spdlog)
+  target_compile_definitions(ComSSUCast PRIVATE HAVE_SPDLOG)
 endif()
 
 # Copy DLNA device description XML to build directory so UpnpAdvertiser can find it at runtime

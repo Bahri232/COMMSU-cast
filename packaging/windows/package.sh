@@ -6,18 +6,18 @@
 set -euo pipefail
 
 BUILD_DIR=${1:-build}
-OUT=${2:-dist/AirShow}
+OUT=${2:-dist/ComSSUCast}
 PREFIX=${MINGW_PREFIX:?run this from an MSYS2 UCRT64/MINGW64 shell}
 
 rm -rf "$OUT"
 mkdir -p "$OUT/lib/gstreamer-1.0"
 
-cp "$BUILD_DIR/airshow.exe" "$OUT/"
+cp "$BUILD_DIR/ComSSUCast.exe" "$OUT/"
 cp -r "$BUILD_DIR/resources" "$OUT/"
 
 # Qt libraries, platform/TLS plugins and QML runtime.
 WINDEPLOYQT=$(command -v windeployqt6 || command -v windeployqt-qt6 || command -v windeployqt)
-"$WINDEPLOYQT" --release --qmldir qml --no-translations "$OUT/airshow.exe"
+"$WINDEPLOYQT" --release --qmldir qml --no-translations "$OUT/ComSSUCast.exe"
 
 # MSYS2's Qt resolves QML imports relative to its install prefix
 # (../share/qt6/qml); point it at windeployqt's layout next to the exe instead.
@@ -74,17 +74,16 @@ while true; do
 done
 
 cat > "$OUT/README.txt" <<'EOF'
-AirShow for Windows
-===================
+ComSSU Cast for Windows
+=======================
 
-Run airshow.exe. Allow it through Windows Firewall when asked (private networks).
+Run ComSSUCast.exe. Allow it through Windows Firewall when asked (private networks).
 
-Nothing else is needed for discovery: AirShow answers mDNS itself (or uses
-Apple's Bonjour if it is installed). If your phone or browser doesn't see
-AirShow, check that the PC's network is set to Private and that AirShow is
-allowed through Windows Firewall.
-
-Project page: https://github.com/zitlem/AirShow
+Discovery: ComSSU Cast broadcasts as "CS Society Display" via mDNS/DNS-SD,
+supporting Apple AirPlay, Google Cast, and Windows Miracast.
+Institution: University of Makeni (UniMak)
+Society: Computer Science Students' Society (ComSSU)
+Lead Developer: Abdul Malik Barrie (BAHRI)
 EOF
 
 echo "Packaged $(find "$OUT" -type f | wc -l) files into $OUT ($(du -sh "$OUT" | cut -f1))"

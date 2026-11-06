@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AirShow — Build and Run (Linux / macOS)
+# ComSSU Cast — Build and Run (Linux / macOS)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,7 +16,7 @@ BUILD_DIR="build/${PRESET##*-}-debug"
 # Preset binaryDir uses: build/linux-debug or build/macos-debug
 BUILD_DIR="build/$PRESET"
 
-echo "=== AirShow Build & Run ==="
+echo "=== ComSSU Cast Build & Run ==="
 echo "Platform: $(uname -s)"
 echo "Preset:   $PRESET"
 echo "Build:    $BUILD_DIR"
@@ -84,17 +84,17 @@ fi
 
 # --- Build ---
 echo "=== Building ==="
-cmake --build "$BUILD_DIR" --target airshow -j "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+cmake --build "$BUILD_DIR" --target ComSSUCast -j "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 echo ""
 
 # --- Run ---
-BINARY="$BUILD_DIR/airshow"
+BINARY="$BUILD_DIR/ComSSUCast"
 if [ ! -f "$BINARY" ]; then
     echo "ERROR: Binary not found at $BINARY"
     exit 1
 fi
 
-echo "=== Running AirShow ==="
+echo "=== Running ComSSU Cast ==="
 echo "Press Ctrl+C to stop."
 echo ""
 exec "$BINARY" "$@"
