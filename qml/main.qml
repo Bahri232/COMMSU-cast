@@ -69,7 +69,8 @@ Window {
         }
     }
 
-    // Top-Right Quick Action Button Row (Touch-friendly for 85" Flat Panels)
+    // ── TOP-RIGHT ACTION CONTROLS ──────────────────────────────────────────────
+    // Clean, consistent circular buttons with white surfaces, blue accents, red exit
     Row {
         anchors {
             top: parent.top
@@ -78,31 +79,34 @@ Window {
             rightMargin: 20
         }
         spacing: 12
-        // Always maintain subtle visibility on touchscreen kiosk displays (opacity 0.4 at rest, 1.0 on active touch/hover)
-        opacity: (mouseTracker.controlsHovered || !connectionBridge.connected) ? 0.95 : 0.4
+        // Subtly visible on touchscreen kiosk displays; full opacity on hover/interaction
+        opacity: (mouseTracker.controlsHovered || !connectionBridge.connected) ? 0.98 : 0.45
 
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
-        // About Button (ℹ️)
+        // 1. About Information Button (ℹ)
         Item {
             id: aboutIconBtn
-            width: 48
-            height: 48
+            width: 46
+            height: 46
 
             Rectangle {
                 anchors.fill: parent
-                color: aboutMouse.containsMouse ? "#00A8E8" : "#B30A1426"
-                border.color: "#00A8E8"
-                border.width: 1
-                radius: 24
-            }
+                radius: 23
+                color: aboutMouse.pressed ? "#D0E8F8" : (aboutMouse.containsMouse ? "#E1F5FE" : "#FFFFFF")
+                border.color: aboutMouse.containsMouse ? "#1565C0" : "#CFE2F3"
+                border.width: 1.2
 
-            Text {
-                anchors.centerIn: parent
-                text: "\u2139\uFE0F" // ℹ️
-                color: "white"
-                font.pixelSize: 18
-                font.family: "sans-serif"
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "\u2139\uFE0F" // ℹ️
+                    color: "#1565C0"
+                    font.pixelSize: 17
+                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                }
             }
 
             MouseArea {
@@ -111,29 +115,36 @@ Window {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: aboutDialog.open()
+
+                ToolTip.visible: containsMouse
+                ToolTip.text: "About System"
+                ToolTip.delay: 400
             }
         }
 
-        // Fullscreen Toggle Button (⛶)
+        // 2. Fullscreen Toggle Button (⛶)
         Item {
             id: fullscreenButton
-            width: 48
-            height: 48
+            width: 46
+            height: 46
 
             Rectangle {
                 anchors.fill: parent
-                color: fsMouseArea.containsMouse ? "#00A8E8" : "#B30A1426"
-                border.color: "#1E3A5F"
-                border.width: 1
-                radius: 24
-            }
+                radius: 23
+                color: fsMouseArea.pressed ? "#D0E8F8" : (fsMouseArea.containsMouse ? "#E1F5FE" : "#FFFFFF")
+                border.color: fsMouseArea.containsMouse ? "#1565C0" : "#CFE2F3"
+                border.width: 1.2
 
-            Text {
-                anchors.centerIn: parent
-                text: "\u26F6"
-                color: "white"
-                font.pixelSize: 22
-                font.family: "sans-serif"
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "\u26F6" // ⛶
+                    color: "#1565C0"
+                    font.pixelSize: 20
+                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                }
             }
 
             MouseArea {
@@ -146,30 +157,38 @@ Window {
                         ? Window.Windowed
                         : Window.FullScreen
                 }
+
+                ToolTip.visible: containsMouse
+                ToolTip.text: root.visibility === Window.FullScreen ? "Exit Fullscreen" : "Enter Fullscreen"
+                ToolTip.delay: 400
             }
         }
 
-        // Close / Exit Application Button (✕)
+        // 3. Close / Exit Button (✕) — Reserved Red Accent
         Item {
             id: closeButton
-            width: 48
-            height: 48
+            width: 46
+            height: 46
 
             Rectangle {
                 anchors.fill: parent
-                color: closeMouseArea.containsMouse ? "#EF4444" : "#B30A1426"
-                border.color: "#EF4444"
-                border.width: 1
-                radius: 24
-            }
+                radius: 23
+                color: closeMouseArea.pressed ? "#FCA5A5" : (closeMouseArea.containsMouse ? "#FEE2E2" : "#FFFFFF")
+                border.color: closeMouseArea.containsMouse ? "#DC2626" : "#FECACA"
+                border.width: 1.2
 
-            Text {
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: 1
-                text: "\u2715"
-                color: "white"
-                font.pixelSize: 20
-                font.family: "sans-serif"
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: 1
+                    text: "\u2715" // ✕
+                    color: "#DC2626" // Pure alert red
+                    font.pixelSize: 18
+                    font.bold: true
+                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                }
             }
 
             MouseArea {
@@ -178,11 +197,15 @@ Window {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: Qt.quit()
+
+                ToolTip.visible: containsMouse
+                ToolTip.text: "Close Application"
+                ToolTip.delay: 400
             }
         }
     }
 
-    // Touch-Friendly Audio Mute / Unmute Button (Active during streams)
+    // ── ACTIVE STREAM AUDIO MUTE CONTROL ───────────────────────────────────────
     Item {
         id: muteButton
         anchors {
@@ -190,19 +213,19 @@ Window {
             horizontalCenter: parent.horizontalCenter
             bottomMargin: 28
         }
-        width: muteLabel.width + 36
-        height: 48
+        width: muteLabel.width + 40
+        height: 46
         visible: connectionBridge.connected && (mouseTracker.controlsHovered || opacity > 0)
-        opacity: mouseTracker.controlsHovered ? 0.95 : 0.0
+        opacity: mouseTracker.controlsHovered ? 0.98 : 0.0
 
         Behavior on opacity { NumberAnimation { duration: 200 } }
 
         Rectangle {
             anchors.fill: parent
-            color: "#CC0F1A2E"
-            border.color: "#00A8E8"
-            border.width: 1
-            radius: 24
+            radius: 23
+            color: muteMouse.containsMouse ? "#E1F5FE" : "#FFFFFF"
+            border.color: "#29B6F6"
+            border.width: 1.2
         }
 
         Row {
@@ -210,22 +233,24 @@ Window {
             spacing: 8
             Text {
                 text: audioBridge.muted ? "\uD83D\uDD07" : "\uD83D\uDD0A"
-                font.pixelSize: 18
+                font.pixelSize: 17
                 anchors.verticalCenter: parent.verticalCenter
             }
             Text {
                 id: muteLabel
                 text: audioBridge.muted ? "Unmute Audio" : "Mute Audio"
-                color: "white"
-                font.pixelSize: 16
+                color: "#1565C0"
+                font.pixelSize: 15
                 font.bold: true
-                font.family: "sans-serif"
+                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
 
         MouseArea {
+            id: muteMouse
             anchors.fill: parent
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: audioBridge.setMuted(!audioBridge.muted)
         }

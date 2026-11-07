@@ -17,10 +17,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#E60F1A2E"
+        color: "#FFFFFF"
         radius: 12
-        border.color: "#00A8E8"
-        border.width: 1.2
+        border.color: "#29B6F6"
+        border.width: 1.5
     }
 
     Text {
@@ -37,10 +37,10 @@ Item {
             var dev = connectionBridge.deviceName.length > 0 ? connectionBridge.deviceName : "Presenter"
             return icon + dev + " connected via " + connectionBridge.protocol
         }
-        color: "#FFFFFF"
-        font.pixelSize: 20
+        color: "#172B45"
+        font.pixelSize: 18
         font.bold: true
-        font.family: "sans-serif"
+        font.family: "Segoe UI, Inter, -apple-system, sans-serif"
     }
 
     NumberAnimation {

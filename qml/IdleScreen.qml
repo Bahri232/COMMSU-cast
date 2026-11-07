@@ -9,476 +9,618 @@ Item {
 
     visible: !connectionBridge.connected
 
-    // Deep modern dark background for high-contrast presentation on 85" displays
+    // Smooth entrance fade
+    opacity: visible ? 1.0 : 0.0
+    Behavior on opacity {
+        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+    }
+
+    // White-first background: Institutional soft blue-white (#F4F9FD)
     Rectangle {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: "#060B14" }
-            GradientStop { position: 0.5; color: "#0A1322" }
-            GradientStop { position: 1.0; color: "#080F1D" }
+        color: "#F4F9FD"
+
+        // Subtle top brand accent bar (Deep blue #1565C0)
+        Rectangle {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 4
+            color: "#1565C0"
         }
     }
 
-    // Main layout container
-    Column {
+    // Scrollable / responsive container
+    Flickable {
         anchors.fill: parent
-        anchors.margins: 36
-        spacing: 24
+        contentWidth: width
+        contentHeight: Math.max(height, mainContent.implicitHeight + 48)
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
 
-        // ── TOP HEADER: Logo, Title, Subtitle & Status Badge ────────────────
-        Column {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 10
+        Item {
+            id: mainContent
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 64, 1380)
+            implicitHeight: contentColumn.implicitHeight
 
-            Image {
-                id: logo
-                source: "qrc:/assets/comssu_logo.png"
-                width: 130
-                height: 130
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
+            Column {
+                id: contentColumn
+                width: parent.width
+                spacing: 24
 
-            Text {
-                text: "ComSSU — Wireless Display System"
-                color: "#FFFFFF"
-                font.pixelSize: 38
-                font.bold: true
-                font.family: "sans-serif"
-                horizontalAlignment: Text.AlignHCenter
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-
-            Text {
-                text: "Computer Science Students' Society (ComSSU) | University of Makeni"
-                color: "#38BDF8"
-                font.pixelSize: 20
-                font.bold: true
-                font.family: "sans-serif"
-                horizontalAlignment: Text.AlignHCenter
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-
-            // Broadcast Name & Status Pill
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 12
-
-                Rectangle {
-                    width: broadcastRow.width + 24
-                    height: 34
-                    radius: 17
-                    color: "#132138"
-                    border.color: "#00A8E8"
-                    border.width: 1
-
-                    Row {
-                        id: broadcastRow
-                        anchors.centerIn: parent
-                        spacing: 8
-
-                        Rectangle {
-                            width: 10
-                            height: 10
-                            radius: 5
-                            color: "#10B981"
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            SequentialAnimation on opacity {
-                                running: idleScreen.visible
-                                loops: Animation.Infinite
-                                NumberAnimation { to: 0.2; duration: 900; easing.type: Easing.InOutSine }
-                                NumberAnimation { to: 1.0; duration: 900; easing.type: Easing.InOutSine }
-                            }
-                        }
-
-                        Text {
-                            text: "Display Name: "
-                            color: "#94A3B8"
-                            font.pixelSize: 15
-                            font.family: "sans-serif"
-                        }
-
-                        Text {
-                            text: appSettings.receiverName
-                            color: "#FFFFFF"
-                            font.pixelSize: 15
-                            font.bold: true
-                            font.family: "sans-serif"
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── MIDDLE SECTION: Instructions (Left) + Prominent PIN Station (Right) ──
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: Math.min(parent.width, 1360)
-            spacing: 28
-
-            // --- Platform Connection Cards ---
-            Row {
-                id: cardsRow
-                spacing: 16
-                width: parent.width - pinStation.width - 28
-
-                // 1. Apple AirPlay
-                Rectangle {
-                    width: (parent.width - 32) / 3
-                    height: 250
-                    radius: 16
-                    color: "#0F1A2E"
-                    border.color: "#1E2E4A"
-                    border.width: 1.5
-
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 12
-
-                        Row {
-                            spacing: 10
-                            Text {
-                                text: "\uD83C\uDF4E" // 🍎
-                                font.pixelSize: 24
-                            }
-                            Column {
-                                Text {
-                                    text: "Apple Devices"
-                                    color: "#FFFFFF"
-                                    font.pixelSize: 18
-                                    font.bold: true
-                                }
-                                Text {
-                                    text: "iOS / iPadOS / macOS"
-                                    color: "#64748B"
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-
-                        Rectangle { width: parent.width; height: 1; color: "#1E293B" }
-
-                        Column {
-                            spacing: 8
-                            width: parent.width
-
-                            Text {
-                                text: "1. Open <b>Control Center</b>"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                            }
-                            Text {
-                                text: "2. Tap <b>Screen Mirroring</b>"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                            }
-                            Text {
-                                text: "3. Select <font color='#38BDF8'><b>CS Society Display</b></font>"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                                wrapMode: Text.WordWrap
-                                width: parent.width
-                            }
-                        }
-                    }
-                }
-
-                // 2. Windows Miracast
-                Rectangle {
-                    width: (parent.width - 32) / 3
-                    height: 250
-                    radius: 16
-                    color: "#0F1A2E"
-                    border.color: "#1E2E4A"
-                    border.width: 1.5
-
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 12
-
-                        Row {
-                            spacing: 10
-                            Text {
-                                text: "\uD83D\uDCBB" // 💻
-                                font.pixelSize: 24
-                            }
-                            Column {
-                                Text {
-                                    text: "Windows PC"
-                                    color: "#FFFFFF"
-                                    font.pixelSize: 18
-                                    font.bold: true
-                                }
-                                Text {
-                                    text: "Windows 10 / 11"
-                                    color: "#64748B"
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-
-                        Rectangle { width: parent.width; height: 1; color: "#1E293B" }
-
-                        Column {
-                            spacing: 8
-                            width: parent.width
-
-                            Text {
-                                text: "1. Press <font color='#38BDF8'><b>Win + K</b></font> (Cast)"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                            }
-                            Text {
-                                text: "2. Select <font color='#38BDF8'><b>CS Society Display</b></font>"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                                wrapMode: Text.WordWrap
-                                width: parent.width
-                            }
-                            Text {
-                                text: "3. Enter PIN if prompted"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                            }
-                        }
-                    }
-                }
-
-                // 3. Android & Google Cast
-                Rectangle {
-                    width: (parent.width - 32) / 3
-                    height: 250
-                    radius: 16
-                    color: "#0F1A2E"
-                    border.color: "#1E2E4A"
-                    border.width: 1.5
-
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 12
-
-                        Row {
-                            spacing: 10
-                            Text {
-                                text: "\uD83D\uDCFA" // 📺
-                                font.pixelSize: 24
-                            }
-                            Column {
-                                Text {
-                                    text: "Android / Chrome"
-                                    color: "#FFFFFF"
-                                    font.pixelSize: 18
-                                    font.bold: true
-                                }
-                                Text {
-                                    text: "Google Cast / Smart View"
-                                    color: "#64748B"
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-
-                        Rectangle { width: parent.width; height: 1; color: "#1E293B" }
-
-                        Column {
-                            spacing: 8
-                            width: parent.width
-
-                            Text {
-                                text: "1. Open Quick Settings or Chrome"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                            }
-                            Text {
-                                text: "2. Tap <b>Cast</b> / <b>Smart View</b>"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                            }
-                            Text {
-                                text: "3. Select <font color='#38BDF8'><b>CS Society Display</b></font>"
-                                color: "#CBD5E1"
-                                font.pixelSize: 14
-                                textFormat: Text.RichText
-                                wrapMode: Text.WordWrap
-                                width: parent.width
-                            }
-                        }
-                    }
-                }
-            }
-
-            // --- High-Contrast Security PIN Station ---
-            Rectangle {
-                id: pinStation
-                width: 380
-                height: 250
-                radius: 18
-                color: "#0A172D"
-                border.color: "#00A8E8"
-                border.width: 2
-
+                // ── 1. HEADER SECTION ──────────────────────────────────────────────
                 Column {
-                    anchors.centerIn: parent
+                    anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 8
-                    width: parent.width - 36
 
-                    Row {
+                    Image {
+                        id: logo
+                        source: "qrc:/assets/comssu_logo.png"
+                        width: 116
+                        height: 116
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        mipmap: true
                         anchors.horizontalCenter: parent.horizontalCenter
-                        spacing: 8
-                        Text {
-                            text: "\uD83D\uDD12" // 🔒
-                            font.pixelSize: 16
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            text: "SECURITY SESSION PIN"
-                            color: "#94A3B8"
-                            font.pixelSize: 14
-                            font.bold: true
-                            font.letterSpacing: 2
-                            font.family: "sans-serif"
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
                     }
 
-                    // Huge glowing 4-digit PIN legible across a large lecture hall
+                    Text {
+                        text: "ComSSU | Wireless Display System"
+                        color: "#172B45" // Dark navy
+                        font.pixelSize: 34
+                        font.bold: true
+                        font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+
+                    Text {
+                        text: "Computer Science Students' Society (ComSSU) | University of Makeni"
+                        color: "#1565C0" // Deep blue
+                        font.pixelSize: 17
+                        font.weight: Font.Medium
+                        font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+
+                    // Connected Display Status Indicator Pill
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: parent.width
-                        height: 90
-                        radius: 12
-                        color: "#070E1C"
-                        border.color: "#1E3A5F"
+                        width: broadcastRow.width + 28
+                        height: 36
+                        radius: 18
+                        color: "#FFFFFF"
+                        border.color: "#CFE2F3"
                         border.width: 1
 
-                        Text {
-                            id: pinDisplay
+                        Row {
+                            id: broadcastRow
                             anchors.centerIn: parent
-                            text: appSettings.pin && appSettings.pin.length > 0 ? appSettings.pin : "----"
-                            color: "#38BDF8"
-                            font.pixelSize: 62
-                            font.bold: true
-                            font.family: "monospace"
-                            font.letterSpacing: 16
-                            horizontalAlignment: Text.AlignHCenter
-                        }
+                            spacing: 8
 
-                        // Touch to refresh PIN
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                appSettings.generateNewPin()
+                            Rectangle {
+                                width: 9
+                                height: 9
+                                radius: 4.5
+                                color: "#10B981" // Emerald green
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                SequentialAnimation on opacity {
+                                    running: idleScreen.visible
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.25; duration: 900; easing.type: Easing.InOutSine }
+                                    NumberAnimation { to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+                                }
+                            }
+
+                            Text {
+                                text: "Display Name:"
+                                color: "#64748B" // Muted blue-grey
+                                font.pixelSize: 14
+                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            Text {
+                                text: appSettings.receiverName
+                                color: "#1565C0" // Deep blue
+                                font.pixelSize: 14
+                                font.bold: true
+                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                    }
+                }
+
+                // ── 2. DEVICE INSTRUCTIONS & SECURITY PIN STATION ──────────────────
+                Item {
+                    id: cardsSection
+                    width: parent.width
+                    implicitHeight: wideLayout ? Math.max(cardsGrid.height, pinStation.height) : (cardsGrid.height + pinStation.height + 20)
+                    property bool wideLayout: width >= 1060
+
+                    // Left Column: 3 Device Instruction Cards
+                    Item {
+                        id: cardsGrid
+                        anchors.left: parent.left
+                        anchors.right: cardsSection.wideLayout ? pinStation.left : parent.right
+                        anchors.rightMargin: cardsSection.wideLayout ? 24 : 0
+                        height: wideCardsRow.height
+
+                        Row {
+                            id: wideCardsRow
+                            width: parent.width
+                            spacing: 16
+
+                            // --- Card 1: Apple Devices ---
+                            Rectangle {
+                                id: cardApple
+                                width: (parent.width - 32) / 3
+                                height: 264
+                                radius: 16
+                                color: "#FFFFFF"
+                                border.color: appleMouse.containsMouse ? "#29B6F6" : "#E2E8F0"
+                                border.width: appleMouse.containsMouse ? 1.5 : 1
+                                y: appleMouse.containsMouse ? -3 : 0
+
+                                Behavior on y { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                                MouseArea {
+                                    id: appleMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.NoButton
+                                }
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 18
+                                    spacing: 12
+
+                                    Row {
+                                        spacing: 12
+                                        Rectangle {
+                                            width: 42
+                                            height: 42
+                                            radius: 21
+                                            color: "#E1F5FE"
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "\uD83C\uDF4E" // 🍎
+                                                font.pixelSize: 22
+                                            }
+                                        }
+                                        Column {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 2
+                                            Text {
+                                                text: "Apple Devices"
+                                                color: "#172B45"
+                                                font.pixelSize: 17
+                                                font.bold: true
+                                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            }
+                                            Text {
+                                                text: "iOS / iPadOS / macOS"
+                                                color: "#64748B"
+                                                font.pixelSize: 12
+                                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle { width: parent.width; height: 1; color: "#F1F5F9" }
+
+                                    Column {
+                                        spacing: 10
+                                        width: parent.width
+
+                                        Text {
+                                            text: "1. Open <b>Control Center</b>"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        }
+                                        Text {
+                                            text: "2. Tap <b>Screen Mirroring</b>"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        }
+                                        Text {
+                                            text: "3. Select <font color='#0288D1'><b>CS Society Display</b></font>"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            wrapMode: Text.WordWrap
+                                            width: parent.width
+                                        }
+                                    }
+                                }
+                            }
+
+                            // --- Card 2: Windows PC ---
+                            Rectangle {
+                                id: cardWindows
+                                width: (parent.width - 32) / 3
+                                height: 264
+                                radius: 16
+                                color: "#FFFFFF"
+                                border.color: winMouse.containsMouse ? "#29B6F6" : "#E2E8F0"
+                                border.width: winMouse.containsMouse ? 1.5 : 1
+                                y: winMouse.containsMouse ? -3 : 0
+
+                                Behavior on y { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                                MouseArea {
+                                    id: winMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.NoButton
+                                }
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 18
+                                    spacing: 12
+
+                                    Row {
+                                        spacing: 12
+                                        Rectangle {
+                                            width: 42
+                                            height: 42
+                                            radius: 21
+                                            color: "#E1F5FE"
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "\uD83D\uDCBB" // 💻
+                                                font.pixelSize: 22
+                                            }
+                                        }
+                                        Column {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 2
+                                            Text {
+                                                text: "Windows PC"
+                                                color: "#172B45"
+                                                font.pixelSize: 17
+                                                font.bold: true
+                                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            }
+                                            Text {
+                                                text: "Windows 10 / 11"
+                                                color: "#64748B"
+                                                font.pixelSize: 12
+                                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle { width: parent.width; height: 1; color: "#F1F5F9" }
+
+                                    Column {
+                                        spacing: 10
+                                        width: parent.width
+
+                                        Text {
+                                            text: "1. Press <font color='#0288D1'><b>Win + K</b></font> (Cast)"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        }
+                                        Text {
+                                            text: "2. Select <font color='#0288D1'><b>CS Society Display</b></font>"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            wrapMode: Text.WordWrap
+                                            width: parent.width
+                                        }
+                                        Text {
+                                            text: "3. Enter PIN if prompted"
+                                            color: "#64748B"
+                                            font.pixelSize: 14
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        }
+                                    }
+                                }
+                            }
+
+                            // --- Card 3: Android / Chrome ---
+                            Rectangle {
+                                id: cardAndroid
+                                width: (parent.width - 32) / 3
+                                height: 264
+                                radius: 16
+                                color: "#FFFFFF"
+                                border.color: androidMouse.containsMouse ? "#29B6F6" : "#E2E8F0"
+                                border.width: androidMouse.containsMouse ? 1.5 : 1
+                                y: androidMouse.containsMouse ? -3 : 0
+
+                                Behavior on y { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                                MouseArea {
+                                    id: androidMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.NoButton
+                                }
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 18
+                                    spacing: 12
+
+                                    Row {
+                                        spacing: 12
+                                        Rectangle {
+                                            width: 42
+                                            height: 42
+                                            radius: 21
+                                            color: "#E1F5FE"
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "\uD83D\uDCFA" // 📺
+                                                font.pixelSize: 22
+                                            }
+                                        }
+                                        Column {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 2
+                                            Text {
+                                                text: "Android / Chrome"
+                                                color: "#172B45"
+                                                font.pixelSize: 17
+                                                font.bold: true
+                                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            }
+                                            Text {
+                                                text: "Google Cast / Smart View"
+                                                color: "#64748B"
+                                                font.pixelSize: 12
+                                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle { width: parent.width; height: 1; color: "#F1F5F9" }
+
+                                    Column {
+                                        spacing: 10
+                                        width: parent.width
+
+                                        Text {
+                                            text: "1. Open Quick Settings / Chrome"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        }
+                                        Text {
+                                            text: "2. Tap <b>Cast</b> or <b>Smart View</b>"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        }
+                                        Text {
+                                            text: "3. Select <font color='#0288D1'><b>CS Society Display</b></font>"
+                                            color: "#334155"
+                                            font.pixelSize: 14
+                                            textFormat: Text.RichText
+                                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                            wrapMode: Text.WordWrap
+                                            width: parent.width
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Enter this 4-digit code if prompted by device"
-                        color: "#94A3B8"
-                        font.pixelSize: 12
-                        font.family: "sans-serif"
+                    // Right Column: High-Contrast Security Session PIN Station
+                    Rectangle {
+                        id: pinStation
+                        anchors.right: parent.right
+                        anchors.top: cardsSection.wideLayout ? parent.top : cardsGrid.bottom
+                        anchors.topMargin: cardsSection.wideLayout ? 0 : 20
+                        width: cardsSection.wideLayout ? 370 : parent.width
+                        height: 264
+                        radius: 16
+                        color: "#EBF5FB" // Subtle light-blue surface
+                        border.color: "#BEE3F8"
+                        border.width: 1.5
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 10
+                            width: parent.width - 36
+
+                            Row {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                spacing: 8
+                                Text {
+                                    text: "\uD83D\uDEE1\uFE0F" // 🛡️
+                                    font.pixelSize: 16
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    text: "SECURITY SESSION PIN"
+                                    color: "#1565C0" // Deep blue
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    font.letterSpacing: 1.5
+                                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+
+                            // Large High-Contrast PIN Container
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: parent.width
+                                height: 88
+                                radius: 12
+                                color: "#FFFFFF"
+                                border.color: pinMouseArea.containsMouse ? "#29B6F6" : "#CFE2F3"
+                                border.width: 1
+
+                                Text {
+                                    id: pinDisplay
+                                    anchors.centerIn: parent
+                                    text: appSettings.pin && appSettings.pin.length > 0 ? appSettings.pin : "----"
+                                    color: "#1565C0" // Deep blue digits
+                                    font.pixelSize: 58
+                                    font.bold: true
+                                    font.family: "Consolas, 'Courier New', monospace"
+                                    font.letterSpacing: 14
+                                    horizontalAlignment: Text.AlignHCenter
+
+                                    // Subtle pulse animation when PIN updates
+                                    Behavior on text {
+                                        SequentialAnimation {
+                                            NumberAnimation { target: pinDisplay; property: "scale"; to: 0.92; duration: 100 }
+                                            NumberAnimation { target: pinDisplay; property: "scale"; to: 1.0; duration: 120 }
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: pinMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: appSettings.generateNewPin()
+
+                                    ToolTip.visible: containsMouse
+                                    ToolTip.text: "Click to generate a new PIN"
+                                    ToolTip.delay: 400
+                                }
+                            }
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "Enter this 4-digit code if prompted by device"
+                                color: "#64748B"
+                                font.pixelSize: 12
+                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                            }
+
+                            // Operator Approval Requirement Notice
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: approvalRow.width + 20
+                                height: 28
+                                radius: 14
+                                color: "#FFFFFF"
+                                border.color: "#E2E8F0"
+                                border.width: 1
+
+                                Row {
+                                    id: approvalRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    Text {
+                                        text: "\u2705"
+                                        font.pixelSize: 11
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    Text {
+                                        text: "On-screen operator approval required"
+                                        color: "#1565C0"
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── 3. BOTTOM BAR: About Button & Academic Year ────────────────────
+                Item {
+                    width: parent.width
+                    height: 50
+
+                    // About Button (Bottom Left)
+                    Rectangle {
+                        id: aboutBtn
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 160
+                        height: 42
+                        radius: 21
+                        color: aboutMouse.containsMouse ? "#E1F5FE" : "#FFFFFF"
+                        border.color: aboutMouse.containsMouse ? "#1565C0" : "#29B6F6"
+                        border.width: 1.2
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Text {
+                                text: "\u2139\uFE0F" // ℹ️
+                                font.pixelSize: 15
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: "About System"
+                                color: "#1565C0"
+                                font.pixelSize: 14
+                                font.bold: true
+                                font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+
+                        MouseArea {
+                            id: aboutMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: idleScreen.requestAbout()
+                        }
                     }
 
-                    Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        spacing: 6
+                    // Academic Year & Institution Note (Bottom Right)
+                    Column {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+
                         Text {
-                            text: "\uD83D\uDEE1\uFE0F" // 🛡️
-                            font.pixelSize: 13
-                        }
-                        Text {
-                            text: "On-screen operator approval required"
-                            color: "#38BDF8"
-                            font.pixelSize: 12
+                            text: "2026/27 Academic Year"
+                            color: "#172B45"
+                            font.pixelSize: 14
                             font.bold: true
+                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                            horizontalAlignment: Text.AlignRight
+                            anchors.right: parent.right
+                        }
+
+                        Text {
+                            text: "University of Makeni (UniMak)"
+                            color: "#64748B"
+                            font.pixelSize: 12
+                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+                            horizontalAlignment: Text.AlignRight
+                            anchors.right: parent.right
                         }
                     }
-                }
-            }
-        }
-
-        // ── BOTTOM BAR: About Button & Academic Year Note ──────────────────
-        Item {
-            width: parent.width
-            height: 54
-
-            // About Button (Bottom Left)
-            Rectangle {
-                id: aboutBtn
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: 170
-                height: 48
-                radius: 24
-                color: aboutMouse.containsMouse ? "#1E3A5F" : "#132138"
-                border.color: "#00A8E8"
-                border.width: 1.2
-
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 8
-                    Text {
-                        text: "\u2139\uFE0F" // ℹ️
-                        font.pixelSize: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    Text {
-                        text: "About System"
-                        color: "#FFFFFF"
-                        font.pixelSize: 15
-                        font.bold: true
-                        font.family: "sans-serif"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    id: aboutMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: idleScreen.requestAbout()
-                }
-            }
-
-            // Academic Year & Institution (Bottom Right)
-            Column {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
-
-                Text {
-                    text: "2026/27 Academic Year"
-                    color: "#94A3B8"
-                    font.pixelSize: 14
-                    font.bold: true
-                    font.family: "sans-serif"
-                    horizontalAlignment: Text.AlignRight
-                    anchors.right: parent.right
-                }
-
-                Text {
-                    text: "University of Makeni (UniMak)"
-                    color: "#64748B"
-                    font.pixelSize: 12
-                    font.family: "sans-serif"
-                    horizontalAlignment: Text.AlignRight
-                    anchors.right: parent.right
                 }
             }
         }

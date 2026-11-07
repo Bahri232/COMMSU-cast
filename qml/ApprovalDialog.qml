@@ -12,10 +12,10 @@ Item {
         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
     }
 
-    // Modal background overlay
+    // Modal background overlay (soft dimmed translucent backdrop)
     Rectangle {
         anchors.fill: parent
-        color: "#B3030712"
+        color: "#660F172A"
 
         MouseArea {
             anchors.fill: parent
@@ -23,16 +23,16 @@ Item {
         }
     }
 
-    // Centered Dialog Card (Optimized for 85" interactive display touch)
+    // Centered Authorization Card (Clean white institutional surface)
     Rectangle {
         id: card
         width: Math.min(600, parent.width - 48)
         height: Math.min(380, parent.height - 48)
         anchors.centerIn: parent
         radius: 18
-        color: "#0F1A2E"
-        border.color: "#00A8E8"
-        border.width: 2
+        color: "#FFFFFF"
+        border.color: "#CFE2F3"
+        border.width: 1.5
 
         MouseArea {
             anchors.fill: parent
@@ -47,18 +47,18 @@ Item {
             // Header Row: Shield Icon & Title
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 12
+                spacing: 10
                 Text {
                     text: "\uD83D\uDEE1\uFE0F" // 🛡️
-                    font.pixelSize: 28
+                    font.pixelSize: 26
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
                     text: "Incoming Connection Request"
-                    color: "#FFFFFF"
-                    font.pixelSize: 22
+                    color: "#172B45" // Dark navy
+                    font.pixelSize: 21
                     font.bold: true
-                    font.family: "sans-serif"
+                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -66,15 +66,15 @@ Item {
             // Device Name & Protocol Card
             Rectangle {
                 width: parent.width
-                height: 72
+                height: 74
                 radius: 12
-                color: "#16253D"
-                border.color: "#22395D"
+                color: "#F4F9FD" // Soft blue-white
+                border.color: "#E2E8F0"
                 border.width: 1
 
                 Row {
                     anchors.centerIn: parent
-                    spacing: 12
+                    spacing: 14
 
                     Text {
                         text: {
@@ -96,18 +96,18 @@ Item {
                             text: connectionBridge.pendingDeviceName.length > 0
                                   ? connectionBridge.pendingDeviceName
                                   : "Unknown Device"
-                            color: "#FFFFFF"
-                            font.pixelSize: 19
+                            color: "#172B45"
+                            font.pixelSize: 18
                             font.bold: true
-                            font.family: "sans-serif"
+                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                         }
 
                         Text {
                             text: "Protocol: " + connectionBridge.pendingProtocol
-                            color: "#38BDF8"
+                            color: "#1565C0"
                             font.pixelSize: 13
                             font.bold: true
-                            font.family: "sans-serif"
+                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                         }
                     }
                 }
@@ -119,9 +119,10 @@ Item {
                 spacing: 10
 
                 Text {
-                    text: "Security PIN:"
-                    color: "#94A3B8"
+                    text: "Session PIN:"
+                    color: "#64748B"
                     font.pixelSize: 14
+                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
@@ -129,43 +130,47 @@ Item {
                     width: pinText.width + 16
                     height: 28
                     radius: 6
-                    color: "#0B1322"
-                    border.color: "#00A8E8"
+                    color: "#EBF5FB"
+                    border.color: "#BEE3F8"
                     border.width: 1
 
                     Text {
                         id: pinText
                         anchors.centerIn: parent
                         text: appSettings.pin
-                        color: "#38BDF8"
+                        color: "#1565C0"
                         font.pixelSize: 15
                         font.bold: true
-                        font.letterSpacing: 3
+                        font.letterSpacing: 2
+                        font.family: "Consolas, monospace"
                     }
                 }
 
                 Text {
                     text: "• Allow projection to interactive screen?"
-                    color: "#CBD5E1"
+                    color: "#334155"
                     font.pixelSize: 14
+                    font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
 
             Item { width: 1; height: 6 }
 
-            // Large Touch-Friendly Action Buttons
+            // Touch-Friendly Action Buttons
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 20
+                spacing: 18
 
                 // Allow Button
                 Rectangle {
                     id: allowBtn
-                    width: 200
-                    height: 56
+                    width: 190
+                    height: 52
                     radius: 12
                     color: allowMouse.containsMouse ? "#059669" : "#10B981"
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
                     Row {
                         anchors.centerIn: parent
@@ -173,15 +178,15 @@ Item {
                         Text {
                             text: "\u2714" // ✔
                             color: "white"
-                            font.pixelSize: 18
+                            font.pixelSize: 16
                             font.bold: true
                         }
                         Text {
                             text: "Allow Screen"
                             color: "white"
-                            font.pixelSize: 17
+                            font.pixelSize: 16
                             font.bold: true
-                            font.family: "sans-serif"
+                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                         }
                     }
 
@@ -200,26 +205,30 @@ Item {
                 // Deny Button
                 Rectangle {
                     id: denyBtn
-                    width: 160
-                    height: 56
+                    width: 150
+                    height: 52
                     radius: 12
-                    color: denyMouse.containsMouse ? "#DC2626" : "#EF4444"
+                    color: denyMouse.containsMouse ? "#FEE2E2" : "#FFFFFF"
+                    border.color: "#DC2626"
+                    border.width: 1.5
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
                     Row {
                         anchors.centerIn: parent
                         spacing: 8
                         Text {
                             text: "\u2716" // ✖
-                            color: "white"
-                            font.pixelSize: 16
+                            color: "#DC2626"
+                            font.pixelSize: 15
                             font.bold: true
                         }
                         Text {
                             text: "Deny"
-                            color: "white"
-                            font.pixelSize: 17
+                            color: "#DC2626"
+                            font.pixelSize: 16
                             font.bold: true
-                            font.family: "sans-serif"
+                            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                         }
                     }
 
