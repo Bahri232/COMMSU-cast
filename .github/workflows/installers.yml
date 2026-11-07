@@ -43,7 +43,7 @@ jobs:
           grep -q "DisableDownloadTimeout" /etc/pacman.conf || echo "DisableDownloadTimeout" >> /etc/pacman.conf
           sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf || true
           for i in 1 2 3; do
-            pacman -S --needed --noconfirm --disable-download-timeout \
+            if pacman -S --needed --noconfirm --disable-download-timeout \
               mingw-w64-ucrt-x86_64-toolchain \
               mingw-w64-ucrt-x86_64-cmake \
               mingw-w64-ucrt-x86_64-ninja \
@@ -62,7 +62,15 @@ jobs:
               mingw-w64-ucrt-x86_64-protobuf \
               mingw-w64-ucrt-x86_64-gtest \
               mingw-w64-ucrt-x86_64-spdlog \
-              zip && break || (echo "Pacman download failed, retrying in 5s ($i/3)..." && sleep 5)
+              zip; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "Pacman download failed after 3 attempts." >&2
+              exit 1
+            fi
+            echo "Pacman download failed, retrying in 5s ($i/3)..."
+            sleep 5
           done
 
       - name: Configure CMake
