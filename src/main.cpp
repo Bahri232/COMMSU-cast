@@ -30,6 +30,8 @@
 #  endif
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
+#  include <io.h>
+#  include <fcntl.h>
 #elif defined(__APPLE__)
 #  include <mach-o/dyld.h>
 #endif
@@ -139,6 +141,34 @@ static void checkRequiredPlugins() {
 }
 
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+    // If output is redirected to a file or pipe (e.g. CI smoke tests or CLI redirect),
+    // ensure standard C runtime file descriptors 1 and 2 write to those handles.
+    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hStdOut != INVALID_HANDLE_VALUE && hStdOut != nullptr && GetFileType(hStdOut) != FILE_TYPE_UNKNOWN) {
+        int fdOut = _open_osfhandle(reinterpret_cast<intptr_t>(hStdOut), _O_TEXT);
+        if (fdOut >= 0) {
+            _dup2(fdOut, 1);
+            setvbuf(stdout, nullptr, _IONBF, 0);
+        }
+    }
+    HANDLE hStdErr = GetStdHandle(STD_ERROR_HANDLE);
+    if (hStdErr != INVALID_HANDLE_VALUE && hStdErr != nullptr && GetFileType(hStdErr) != FILE_TYPE_UNKNOWN) {
+        int fdErr = _open_osfhandle(reinterpret_cast<intptr_t>(hStdErr), _O_TEXT);
+        if (fdErr >= 0) {
+            _dup2(fdErr, 2);
+            setvbuf(stderr, nullptr, _IONBF, 0);
+        }
+    }
+    // If explicitly executed from an existing terminal, attach output to the parent console.
+    // When launched from desktop or start menu shortcut, this returns false and no console window appears.
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        FILE* fp = nullptr;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+    }
+#endif
+
     useBundledGStreamer();
     gst_init(&argc, &argv);
     checkRequiredPlugins();

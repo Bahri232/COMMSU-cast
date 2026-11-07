@@ -129,7 +129,7 @@ if(WIN32)
 endif()
 
 # Main executable
-qt_add_executable(ComSSUCast
+qt_add_executable(ComSSUCast WIN32
   ${APP_RC_SRC}
   src/main.cpp
   src/pipeline/MediaPipeline.cpp
@@ -160,6 +160,10 @@ qt_add_executable(ComSSUCast
   src/web/WebInterface.cpp
   src/platform/WindowsFirewall.cpp
 )
+
+if(WIN32)
+  set_target_properties(ComSSUCast PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
 
 # QML lives under Qt's standard :/qt/qml/ resource prefix (on the default import
 # path, so the binary doesn't depend on a qmldir next to it), and the module's
