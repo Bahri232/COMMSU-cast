@@ -1,184 +1,56 @@
+# ComSSU Cast — Wireless Display System
 
+[[https://img.shields.io/badge/version-1.0.0-blue.svg]](https://github.com/Bahri232/COMMSU-cast/releases)
+[[https://img.shields.io/badge/academic%20year-2026%2F27-green.svg]](https://unimak.edu.sl)
+[[https://img.shields.io/badge/society-ComSSU%20UniMak-orange.svg]](https://unimak.edu.sl)
+[[https://img.shields.io/badge/License-GPLv3-blue.svg]](https://www.gnu.org/licenses/gpl-3.0)
 
-# AirShow
+> **"Engineered for cross-platform wireless screen projection (AirPlay, Miracast, Google Cast) for large-format interactive flat panel displays."**
 
-A free, open-source, cross-platform screen mirroring receiver. Turn any computer into a wireless display that accepts screen mirrors from phones, tablets, and other computers.
+**ComSSU Cast** turns computers and interactive flat panels into dedicated wireless presentation receivers. Designed for lecture halls, laboratories, and conference environments, it allows students, faculty, and presenters to mirror screens instantly from iPhones, iPads, Macs, Windows laptops, and Android devices without installing proprietary third-party software.
 
-**Think AirServer, but free.**
+---
+
+## Key Highlights
+
+- **Multi-Protocol Receiver:** Accepts connections via Apple AirPlay, Microsoft Miracast (MS-MICE), Google Cast, and DLNA.
+- **Optimized for 85" Interactive Displays:** Default fullscreen kiosk mode designed for large-format 4K interactive touch panels.
+- **Zero Client Software:** Presenters use their operating system's built-in cast controls.
+- **Dual-Layer Security:** Prominently displays a dynamic **4-digit PIN** on the idle HUD alongside an interactive **Allow / Deny** authorization dialog for incoming streams.
+- **Hardware-Accelerated Decoding:** Low-latency H.264/H.265 video pipelines paired with synchronized audio playback via GStreamer.
+- **Network Broadcast Name:** Broadcasts across local networks as **`CS Society Display`**.
+
+---
 
 ## Supported Protocols
 
-| Protocol | Source Devices | Status |
-|----------|---------------|--------|
-| **AirPlay** | iPhone, iPad, Mac | Working (needs device testing) |
-| **Google Cast** | Chrome browser (desktop) | Implemented (Cast Streaming receiver), needs device testing |
-| **Miracast** | Windows 10/11 | Implemented (MS-MICE), needs device testing |
-| **DLNA** | Any DLNA controller app | Working (needs device testing) |
+| Protocol | Source Devices | Native Menu / Method | Status |
+| :--- | :--- | :--- | :--- |
+| **AirPlay 2** | iPhone, iPad, Mac | Control Center → Screen Mirroring | Supported (Hardware H.264 & AAC Audio) |
+| **Miracast (MS-MICE)** | Windows 10 / 11 | `Win + K` (Cast Menu) | Supported (Infrastructure mode) |
+| **Google Cast** | Chrome Browser, Android | Cast Screen / Smart View | Supported (CastV2 streaming receiver) |
+| **DLNA** | Android, media controllers | Cast media / DLNA share | Supported |
 
-## Features
 
-- **Multi-protocol** --- one app receives from any device
-- **Fullscreen receiver** with correct aspect ratio (letterboxed when needed)
-- **Connection status HUD** showing device name and protocol
-- **Audio playback** with mute toggle
-- **Hardware H.264 decode** with automatic software fallback
-- **Security controls** --- device approval prompts, PIN pairing, LAN-only filtering
-- **Windowed mode** (`--windowed` flag) for development and testing
-- **Close button + mute** appear on mouse hover
 
-## Quick Start
+## Quick Start (Prebuilt Executable)
 
-### Download (no install)
+Precompiled binaries are published on the [Releases](https://github.com/Bahri232/COMMSU-cast/releases) page. No installation required:
 
-Prebuilt builds are on the [Releases](https://github.com/zitlem/AirShow/releases) page. Nothing is installed — each one runs in place:
+| Platform | Package | How to Run |
+| :--- | :--- | :--- |
+| **Windows 10/11 (x64)** | `ComSSUCast-windows-x64.zip` | Extract and run `ComSSUCast.exe` |
+| **Linux (x86_64, glibc 2.35+)** | `ComSSUCast-linux-x86_64.AppImage` | `chmod +x ComSSUCast-*.AppImage && ./ComSSUCast-*.AppImage` |
+| **macOS 13+ (Apple Silicon)** | `ComSSUCast-macos-arm64.dmg` | Open the `.dmg` and launch `ComSSUCast` |
 
-| Platform | Download | Run |
-|----------|----------|-----|
-| Windows 10/11 (x64) | `AirShow-windows-x64.zip` | Unzip anywhere, run `AirShow\airshow.exe` |
-| macOS 13+ (Apple Silicon) | `AirShow-macos-arm64.dmg` | Open the .dmg and run AirShow (or drag it anywhere). It isn't notarized: the first time, right-click → **Open**. |
-| Linux (x86_64, glibc 2.35+) | `AirShow-linux-x86_64.AppImage` | `chmod +x AirShow-*.AppImage && ./AirShow-*.AppImage` |
+> **Network Note:** Presenters and the receiver must be on the same local network subnet. When running `ComSSUCast.exe` on Windows for the first time, allow network access on Private networks when prompted by Windows Defender Firewall.
 
-Device discovery (AirPlay, Google Cast, Miracast) needs nothing extra: AirShow uses the system's mDNS service where there is one (macOS, Avahi on Linux, Bonjour on Windows if installed) and otherwise answers mDNS itself with its built-in responder. On Windows, allow AirShow through the firewall on private networks when asked.
+---
 
-## Build from source
+## Building From Source
 
-### Linux (Ubuntu/Debian)
+### Windows (MSYS2 / UCRT64)
 
-AirShow needs **Qt 6.8 or newer**. Ubuntu 25.04+ / Debian 13 ship it (`qt6-base-dev qt6-declarative-dev`); on Ubuntu 24.04 install Qt 6.8 with the [Qt online installer](https://www.qt.io/download-qt-installer) or [aqtinstall](https://github.com/miurahr/aqtinstall) and pass `-DCMAKE_PREFIX_PATH=<qt>/gcc_64`.
-
-```bash
-sudo apt install \
-  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
-  libssl-dev libavahi-client-dev libavahi-compat-libdnssd-dev \
-  libupnp-dev libplist-dev libprotobuf-dev protobuf-compiler \
-  libgtest-dev libgmock-dev ninja-build cmake pkg-config
-git submodule update --init
-./build-and-run.sh            # add --windowed for a normal window
-```
-
-### macOS (Homebrew)
-
-```bash
-brew install qt gstreamer openssl libplist libupnp protobuf googletest ninja cmake pkgconf
-git submodule update --init
-./build-and-run.sh
-```
-
-### Windows — build from source (MSYS2)
-
-Install [MSYS2](https://www.msys2.org/), open the **UCRT64** shell and run:
-
-```bash
-pacman -S --needed git mingw-w64-ucrt-x86_64-{toolchain,cmake,ninja,pkgconf,qt6-base,qt6-declarative,qt6-tools,gstreamer,gst-plugins-base,gst-plugins-good,gst-plugins-bad,gst-plugins-ugly,gst-libav,openssl,libupnp,libplist,protobuf,gtest}
-git clone --recursive https://github.com/zitlem/AirShow.git && cd AirShow
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-packaging/windows/package.sh build dist/AirShow   # optional: self-contained folder
-```
-
-Neither the Bonjour SDK nor Bonjour itself is needed: without Bonjour, AirShow's built-in mDNS responder handles discovery.
-
-## Manual Build
-
-```bash
-cmake --preset linux-debug    # or macos-debug / windows-msys2-debug
-cmake --build build/linux-debug
-./build/linux-debug/airshow
-```
-
-## Architecture
-
-```
-src/
-  main.cpp                    # Application entry point
-  pipeline/                   # GStreamer media pipeline (appsrc, uridecodebin, webrtcbin, MPEG-TS)
-  protocol/                   # Protocol handlers
-    ProtocolHandler.h          # Abstract interface
-    ProtocolManager.h          # Handler registry
-    AirPlayHandler.h           # AirPlay 2 via UxPlay
-    DlnaHandler.h              # DLNA DMR via libupnp
-    CastHandler.h              # Google Cast via CASTV2 protobuf (TLS on port 8009)
-    MiracastHandler.h          # Miracast over Infrastructure (MS-MICE)
-  discovery/                  # mDNS/SSDP service advertisement
-    DiscoveryManager.h         # Advertises all protocols
-    AvahiAdvertiser.h          # Linux mDNS backend
-    UpnpAdvertiser.h           # DLNA SSDP backend
-  security/                   # Connection approval, PIN, network filter
-    SecurityManager.h
-  settings/                   # QSettings persistence
-    AppSettings.h
-  ui/                         # Qt Quick/QML bridges
-    ReceiverWindow.h
-    ConnectionBridge.h         # HUD state + approval dialog
-    AudioBridge.h              # Mute toggle
-    SettingsBridge.h           # Settings exposure to QML
-  platform/
-    WindowsFirewall.h          # Windows firewall rule registration
-qml/
-  main.qml                    # Root window
-  HudOverlay.qml              # Connection status overlay
-  IdleScreen.qml              # Waiting screen + PIN display
-  ApprovalDialog.qml           # Device approval prompt
-```
-
-## Technology Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Language | C++17 |
-| GUI | Qt 6.8+ / Qt Quick / QML |
-| Media Pipeline | GStreamer 1.26.x |
-| Video Rendering | GStreamer appsink → Qt `VideoFrameSink` |
-| AirPlay | UxPlay (embedded) |
-| DLNA | libupnp (pupnp) |
-| Google Cast | protobuf + OpenSSL (TLS, AES-CTR) + Cast Streaming over UDP |
-| Miracast | MS-MICE (TCP/RTSP) |
-| Discovery | Avahi (Linux), Bonjour (macOS, Windows if installed), built-in mDNS responder otherwise |
-| Build | CMake + Ninja |
-| Crypto | OpenSSL 3.x / 4.x |
-
-## Security
-
-AirShow includes three security layers:
-
-1. **Device Approval** --- new devices trigger an Allow/Deny dialog before mirroring starts. Approved devices are remembered.
-2. **PIN Pairing** --- optional 4-digit PIN displayed on the receiver. Devices must enter the correct PIN to connect.
-3. **LAN-Only Filter** --- connections from non-RFC1918 IPs are rejected. VPN interfaces are excluded from listener binding.
-
-## Known Limitations
-
-- **Google Cast authentication** uses precomputed RSA signatures from AirReceiver (via shanocast). They cover through ~2027-12-21 and cannot be regenerated; Google may also revoke them at any time. Android "Cast screen" is not expected to work with these credentials.
-- **Google Cast media** uses AirShow's own Cast Streaming receiver (`src/cast/CastStreamingReceiver`): RTP + AES-128-CTR + RTCP feedback, VP8/VP9/H.264 video and Opus audio. Not yet verified against a real Chrome sender.
-- **Miracast** uses MS-MICE (infrastructure mode) only. Wi-Fi Direct Miracast is not supported due to unstable Linux kernel/wpa_supplicant P2P APIs.
-- **Android Miracast** support varies by OEM. Most Android devices use Wi-Fi Direct only and won't connect via MS-MICE.
-- **HDCP content** (Netflix, Disney+, etc.) is blocked at the protocol level by DRM --- this is not a bug.
-
-## Testing
-
-```bash
-# Run all tests
-cd build/linux-debug && ctest --output-on-failure
-
-# Run tests for a specific protocol
-ctest -R test_airplay
-ctest -R test_dlna
-ctest -R test_cast
-ctest -R test_miracast
-ctest -R test_security
-```
-
-## Contributing
-
-Contributions welcome. The codebase follows these conventions:
-
-- C++17, Qt Quick/QML, GStreamer
-- Pure virtual `ProtocolHandler` interface for each protocol
-- `MediaPipeline` with pluggable modes (appsrc, uridecodebin, webrtcbin, MPEG-TS)
-- GTest for unit and integration tests
-- CMake with presets for Linux/macOS/Windows
-
-## License
-
-Open source (license TBD).
+1. Install [MSYS2](https://www.msys2.org/). Open the **MSYS2 UCRT64** terminal and install the toolchain:
+   ```bash
+   pacman -S --needed git mingw-w64-ucrt-x86_64-{toolchain,cmake,ninja,pkgconf,qt6-base,qt6-declarative,qt6-tools,gstreamer,gst-plugins-base,gst-plugins-good,gst-plugins-bad,gst-plugins-ugly,gst-libav,openssl,libupnp,libplist,protobuf,gtest}
