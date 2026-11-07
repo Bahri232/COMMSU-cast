@@ -26,7 +26,7 @@ jobs:
         shell: msys2 {0}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -93,7 +93,7 @@ jobs:
           }
 
       - name: Upload Windows Installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ComSSUCast-Windows-Installers
           path: |
@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -164,7 +164,7 @@ jobs:
           dpkg-deb --build deb "dist/comssucast_${DEB_VER}_amd64.deb"
 
       - name: Upload Linux Installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ComSSUCast-Linux-Installers
           path: |
@@ -179,10 +179,9 @@ jobs:
     runs-on: macos-15
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
-      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -199,7 +198,7 @@ jobs:
         run: packaging/macos/package.sh build dist "${VERSION#v}"
 
       - name: Upload macOS Installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ComSSUCast-macOS-Installers
           path: dist/ComSSUCast-macos-*.dmg
@@ -215,7 +214,7 @@ jobs:
       contents: write
     steps:
       - name: Download All Platform Installers
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: release-artifacts
@@ -225,7 +224,7 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', env.VERSION) }}
           name: ComSSU Wireless Display System v${{ env.VERSION }}

@@ -17,7 +17,7 @@ jobs:
     name: Linux tests (Ubuntu 24.04)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -57,7 +57,7 @@ jobs:
     # Oldest supported glibc: the AppImage runs on distros at least this new.
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -111,7 +111,7 @@ jobs:
           grep -q "AirShowHandler: listening on port 7400" smoke.log
           test $mdns -eq 0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ComSSUCast-linux-x86_64
           path: dist/ComSSUCast-linux-x86_64.AppImage
@@ -121,9 +121,8 @@ jobs:
     runs-on: macos-15
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
-      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -144,7 +143,7 @@ jobs:
       - name: Package
         run: packaging/macos/package.sh build dist "${VERSION#v}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ComSSUCast-macos-arm64
           path: dist/ComSSUCast-macos-arm64.dmg
@@ -156,7 +155,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -249,7 +248,7 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\installer.iss /Odist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ComSSUCast-windows-x64
           path: |
@@ -264,10 +263,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             ComSSUCast-windows-x64-Setup.exe
