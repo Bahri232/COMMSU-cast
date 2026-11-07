@@ -189,10 +189,14 @@ Item {
                                             radius: 21
                                             color: "#E1F5FE"
                                             anchors.verticalCenter: parent.verticalCenter
-                                            Text {
+                                            Image {
                                                 anchors.centerIn: parent
-                                                text: "\uD83C\uDF4E" // 🍎
-                                                font.pixelSize: 22
+                                                source: "qrc:/assets/apple_icon.png"
+                                                width: 24
+                                                height: 24
+                                                fillMode: Image.PreserveAspectFit
+                                                smooth: true
+                                                mipmap: true
                                             }
                                         }
                                         Column {
@@ -281,10 +285,14 @@ Item {
                                             radius: 21
                                             color: "#E1F5FE"
                                             anchors.verticalCenter: parent.verticalCenter
-                                            Text {
+                                            Image {
                                                 anchors.centerIn: parent
-                                                text: "\uD83D\uDCBB" // 💻
-                                                font.pixelSize: 22
+                                                source: "qrc:/assets/windows_icon.png"
+                                                width: 24
+                                                height: 24
+                                                fillMode: Image.PreserveAspectFit
+                                                smooth: true
+                                                mipmap: true
                                             }
                                         }
                                         Column {
@@ -372,10 +380,14 @@ Item {
                                             radius: 21
                                             color: "#E1F5FE"
                                             anchors.verticalCenter: parent.verticalCenter
-                                            Text {
+                                            Image {
                                                 anchors.centerIn: parent
-                                                text: "\uD83D\uDCFA" // 📺
-                                                font.pixelSize: 22
+                                                source: "qrc:/assets/android_icon.png"
+                                                width: 24
+                                                height: 24
+                                                fillMode: Image.PreserveAspectFit
+                                                smooth: true
+                                                mipmap: true
                                             }
                                         }
                                         Column {

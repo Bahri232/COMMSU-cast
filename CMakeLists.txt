@@ -177,6 +177,9 @@ qt_add_qml_module(ComSSUCast
     qml/AboutDialog.qml
   RESOURCES
     assets/comssu_logo.png
+    assets/apple_icon.png
+    assets/windows_icon.png
+    assets/android_icon.png
     resources/icons/comssu_logo.png
     resources/icons/app_icon.ico
 )
@@ -186,6 +189,9 @@ qt_add_resources(ComSSUCast "app_assets"
   PREFIX "/"
   FILES
     assets/comssu_logo.png
+    assets/apple_icon.png
+    assets/windows_icon.png
+    assets/android_icon.png
     resources/icons/app_icon.ico
 )
 

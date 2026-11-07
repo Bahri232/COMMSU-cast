@@ -76,16 +76,27 @@ Item {
                     anchors.centerIn: parent
                     spacing: 14
 
-                    Text {
-                        text: {
-                            var proto = connectionBridge.pendingProtocol
-                            if (proto === "AirPlay") return "\uD83C\uDF4E"
-                            if (proto === "Cast") return "\uD83D\uDCFA"
-                            if (proto === "Miracast") return "\uD83D\uDCBB"
-                            return "\uD83D\uDCF1"
-                        }
-                        font.pixelSize: 28
+                    Rectangle {
+                        width: 44
+                        height: 44
+                        radius: 22
+                        color: "#E1F5FE"
                         anchors.verticalCenter: parent.verticalCenter
+
+                        Image {
+                            anchors.centerIn: parent
+                            source: {
+                                var proto = connectionBridge.pendingProtocol
+                                if (proto === "AirPlay") return "qrc:/assets/apple_icon.png"
+                                if (proto === "Miracast") return "qrc:/assets/windows_icon.png"
+                                return "qrc:/assets/android_icon.png"
+                            }
+                            width: 26
+                            height: 26
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            mipmap: true
+                        }
                     }
 
                     Column {

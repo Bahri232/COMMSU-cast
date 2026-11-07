@@ -12,8 +12,8 @@ Item {
         horizontalCenter: parent.horizontalCenter
         topMargin: 24
     }
-    width: hudContent.width + 36
-    height: hudContent.height + 20
+    width: hudRow.width + 36
+    height: hudRow.height + 20
 
     Rectangle {
         anchors.fill: parent
@@ -23,24 +23,38 @@ Item {
         border.width: 1.5
     }
 
-    Text {
-        id: hudContent
+    Row {
+        id: hudRow
         anchors.centerIn: parent
-        text: {
-            var icon = ""
-            if (connectionBridge.protocol === "AirPlay")        icon = "\uD83C\uDF4E "   // 🍎
-            else if (connectionBridge.protocol === "Cast")     icon = "\uD83D\uDCFA "   // 📺
-            else if (connectionBridge.protocol === "Miracast")  icon = "\uD83D\uDCBB "   // 💻
-            else if (connectionBridge.protocol === "DLNA")      icon = "\uD83C\uDFB5 "   // 🎵
-            else                                               icon = "\uD83D\uDCF1 "   // 📱
+        spacing: 10
 
-            var dev = connectionBridge.deviceName.length > 0 ? connectionBridge.deviceName : "Presenter"
-            return icon + dev + " connected via " + connectionBridge.protocol
+        Image {
+            source: {
+                var proto = connectionBridge.protocol
+                if (proto === "AirPlay") return "qrc:/assets/apple_icon.png"
+                if (proto === "Miracast") return "qrc:/assets/windows_icon.png"
+                return "qrc:/assets/android_icon.png"
+            }
+            width: 22
+            height: 22
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+            anchors.verticalCenter: parent.verticalCenter
         }
-        color: "#172B45"
-        font.pixelSize: 18
-        font.bold: true
-        font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+
+        Text {
+            id: hudContent
+            anchors.verticalCenter: parent.verticalCenter
+            text: {
+                var dev = connectionBridge.deviceName.length > 0 ? connectionBridge.deviceName : "Presenter"
+                return dev + " connected via " + connectionBridge.protocol
+            }
+            color: "#172B45"
+            font.pixelSize: 18
+            font.bold: true
+            font.family: "Segoe UI, Inter, -apple-system, sans-serif"
+        }
     }
 
     NumberAnimation {
