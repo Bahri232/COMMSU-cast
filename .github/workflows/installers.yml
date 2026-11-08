@@ -240,7 +240,7 @@ jobs:
 
       - name: Build Release APK
         working-directory: sender
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Package APK Artifact
         run: |
