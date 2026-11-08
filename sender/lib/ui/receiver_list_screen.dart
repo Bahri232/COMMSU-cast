@@ -55,7 +55,7 @@ class _ReceiverListScreenState extends State<ReceiverListScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('AirShow Sender'),
+          title: const Text('ComSSU Cast'),
         ),
         body: BlocBuilder<DiscoveryCubit, DiscoveryState>(
           builder: (context, discoveryState) {

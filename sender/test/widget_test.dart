@@ -13,6 +13,6 @@ void main() {
     await tester.pumpWidget(const AirShowSenderApp());
 
     // Verify the app bar title is shown.
-    expect(find.text('AirShow Sender'), findsOneWidget);
+    expect(find.text('ComSSU Cast'), findsOneWidget);
   });
 }

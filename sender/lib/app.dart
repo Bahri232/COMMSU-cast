@@ -17,9 +17,9 @@ class AirShowSenderApp extends StatelessWidget {
         BlocProvider(create: (_) => SessionCubit(AirShowChannel())),
       ],
       child: MaterialApp(
-        title: 'AirShow Sender',
+        title: 'ComSSU Cast',
         theme: ThemeData(
-          colorSchemeSeed: Colors.blue,
+          colorSchemeSeed: const Color(0xFF1565C0),
           useMaterial3: true,
         ),
         home: const ReceiverListScreen(),
