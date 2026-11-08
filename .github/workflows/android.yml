@@ -54,25 +54,7 @@ jobs:
 
       - name: Build Android Release APK
         working-directory: sender
-        run: |
-          set +e
-          flutter build apk --release > flutter_build.log 2>&1
-          FLUTTER_EXIT=$?
-          if [ $FLUTTER_EXIT -ne 0 ]; then
-            echo "Flutter build failed with exit code $FLUTTER_EXIT"
-            cd android
-            ./gradlew assembleRelease --stacktrace > ../gradle_build.log 2>&1
-            exit 1
-          fi
-
-      - name: Upload Build Logs on Failure
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: flutter-build-logs
-          path: |
-            sender/*.log
-            sender/build/app/outputs/logs/
+        run: flutter build apk --release -v
 
       - name: Prepare APK Artifacts
         run: |
