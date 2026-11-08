@@ -30,6 +30,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate Gradle Wrapper
+        working-directory: sender/android
+        run: |
+          gradle wrapper --gradle-version 8.11 --distribution-type all
+          chmod +x gradlew
+          ./gradlew --version
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
