@@ -237,9 +237,7 @@ jobs:
 
       - name: Build Release APK
         working-directory: sender
-        run: |
-          flutter create . --platforms=android
-          flutter build apk --release --verbose
+        run: flutter build apk --release
 
       - name: Package APK Artifact
         run: |
