@@ -321,7 +321,7 @@ Item {
                                         width: parent.width
 
                                         Text {
-                                            text: "1. Press <font color='#0288D1'><b>Win + K</b></font> (Cast)"
+                                            text: "1. Press <font color='#0288D1'><b>Win + K</b></font> or use <b>Chrome</b>"
                                             color: "#334155"
                                             font.pixelSize: 14
                                             textFormat: Text.RichText
@@ -337,7 +337,7 @@ Item {
                                             width: parent.width
                                         }
                                         Text {
-                                            text: "3. Enter PIN if prompted"
+                                            text: "3. Confirm approval on screen"
                                             color: "#64748B"
                                             font.pixelSize: 14
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
@@ -416,9 +416,10 @@ Item {
                                         width: parent.width
 
                                         Text {
-                                            text: "1. Open Quick Settings / Chrome"
+                                            text: "1. Open <b>Chrome</b> / Quick Settings"
                                             color: "#334155"
                                             font.pixelSize: 14
+                                            textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                         }
                                         Text {

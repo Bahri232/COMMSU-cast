@@ -42,10 +42,11 @@ static constexpr const char* kNsReceiver    = "urn:x-cast:com.google.cast.receiv
 static constexpr const char* kNsMedia       = "urn:x-cast:com.google.cast.media";
 static constexpr const char* kNsWebrtc      = "urn:x-cast:com.google.cast.webrtc";
 
-// Chrome Mirroring app IDs accepted at LAUNCH
-static constexpr const char* kAppIdChromeMirror = "0F5096E8";
-static constexpr const char* kAppIdDefaultMedia = "CC1AD845";
-static constexpr const char* kAppIdAudioMirror  = "85CDB22F";  // audio-only mirroring
+// Chrome & Android Mirroring app IDs accepted at LAUNCH
+static constexpr const char* kAppIdChromeMirror  = "0F5096E8"; // Chrome Desktop/Tab Mirroring
+static constexpr const char* kAppIdAndroidMirror = "674A0243"; // Android Native Screen Mirroring
+static constexpr const char* kAppIdDefaultMedia  = "CC1AD845"; // Default Media Receiver
+static constexpr const char* kAppIdAudioMirror   = "85CDB22F"; // audio-only mirroring
 
 // ── CastSession ───────────────────────────────────────────────────────────────
 
@@ -379,33 +380,18 @@ void CastSession::onReceiver(const CastMessage& msg) {
     } else if (type == QStringLiteral("LAUNCH")) {
         QString appId = json.value(QStringLiteral("appId")).toString();
 
-        if (appId == QLatin1StringView(kAppIdChromeMirror) ||
-            appId == QLatin1StringView(kAppIdAudioMirror) ||
-            appId == QLatin1StringView(kAppIdDefaultMedia)) {
+        m_appLaunched = true;
+        m_launchedAppId = appId.isEmpty() ? QString::fromLatin1(kAppIdChromeMirror) : appId;
+        qDebug("CastSession: LAUNCH app %s, transportId=%s",
+               qPrintable(m_launchedAppId), qPrintable(m_transportId));
 
-            m_appLaunched = true;
-            m_launchedAppId = appId;
-            qDebug("CastSession: LAUNCH app %s, transportId=%s",
-                   qPrintable(appId), qPrintable(m_transportId));
-
-            QByteArray status = buildReceiverStatus(requestId);
-            CastMessage reply = makeJsonMsg(
-                QStringLiteral("receiver-0"),
-                QString::fromStdString(msg.source_id()),
-                QStringLiteral("urn:x-cast:com.google.cast.receiver"),
-                status);
-            sendMessage(reply);
-        } else {
-            qDebug("CastSession: LAUNCH unknown appId '%s' — sending empty status",
-                   qPrintable(appId));
-            QByteArray status = buildReceiverStatus(requestId);
-            CastMessage reply = makeJsonMsg(
-                QStringLiteral("receiver-0"),
-                QString::fromStdString(msg.source_id()),
-                QStringLiteral("urn:x-cast:com.google.cast.receiver"),
-                status);
-            sendMessage(reply);
-        }
+        QByteArray status = buildReceiverStatus(requestId);
+        CastMessage reply = makeJsonMsg(
+            QStringLiteral("receiver-0"),
+            QString::fromStdString(msg.source_id()),
+            QStringLiteral("urn:x-cast:com.google.cast.receiver"),
+            status);
+        sendMessage(reply);
 
     } else if (type == QStringLiteral("STOP")) {
         m_appLaunched = false;
@@ -674,10 +660,15 @@ QByteArray CastSession::buildReceiverStatus(int requestId) const {
     if (m_appLaunched && !m_launchedAppId.isEmpty()) {
         QJsonObject app;
         app[QStringLiteral("appId")] = m_launchedAppId;
-        app[QStringLiteral("displayName")] =
-            (m_launchedAppId == QLatin1StringView(kAppIdDefaultMedia))
-                ? QStringLiteral("Default Media Receiver")
-                : QStringLiteral("Chrome Mirroring");
+        QString displayName = QStringLiteral("Screen Mirroring");
+        if (m_launchedAppId == QLatin1StringView(kAppIdDefaultMedia)) {
+            displayName = QStringLiteral("Default Media Receiver");
+        } else if (m_launchedAppId == QLatin1StringView(kAppIdAndroidMirror)) {
+            displayName = QStringLiteral("Android Screen Mirroring");
+        } else if (m_launchedAppId == QLatin1StringView(kAppIdChromeMirror)) {
+            displayName = QStringLiteral("Chrome Mirroring");
+        }
+        app[QStringLiteral("displayName")] = displayName;
         app[QStringLiteral("transportId")] = m_transportId;
         app[QStringLiteral("sessionId")] = m_transportId;
         app[QStringLiteral("isIdleScreen")] = false;
@@ -693,6 +684,12 @@ QByteArray CastSession::buildReceiverStatus(int requestId) const {
         QJsonObject nsConn;
         nsConn[QStringLiteral("name")] = QStringLiteral("urn:x-cast:com.google.cast.tp.connection");
         namespaces.append(nsConn);
+        QJsonObject nsHeartbeat;
+        nsHeartbeat[QStringLiteral("name")] = QStringLiteral("urn:x-cast:com.google.cast.tp.heartbeat");
+        namespaces.append(nsHeartbeat);
+        QJsonObject nsReceiver;
+        nsReceiver[QStringLiteral("name")] = QStringLiteral("urn:x-cast:com.google.cast.receiver");
+        namespaces.append(nsReceiver);
 
         app[QStringLiteral("namespaces")] = namespaces;
         applications.append(app);

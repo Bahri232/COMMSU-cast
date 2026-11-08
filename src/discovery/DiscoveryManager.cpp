@@ -101,7 +101,7 @@ bool DiscoveryManager::start() {
     std::vector<TxtRecord> castTxt = {
         {"id", castIdNoHyphens},
         {"ve", "05"},
-        {"md", "ComSSUCast"},
+        {"md", "Chromecast"},
         {"fn", name},
         {"ic", "/icon.png"},
         {"ca", "4101"},  // 0x1005 = VIDEO_OUT|AUDIO_OUT|CAST_PROTOCOL_V2 — required for Chrome to list device
@@ -119,9 +119,10 @@ bool DiscoveryManager::start() {
 
     // --- _display._tcp (MS-MICE Miracast over Infrastructure — DISC-04, D-04) ---
     // Windows "Connect" app discovers receivers via this mDNS service type.
-    // TXT records: VerMgmt and VerMin from MS-MICE spec revision 6.0.
-    // Per RESEARCH.md Pitfall 1: without this advertisement Windows "Connect" shows no devices.
+    // TXT records: container_id, VerMgmt, and VerMin per [MS-MICE] specification.
+    const std::string containerId = getOrCreateUuid("miracast/container_id");
     std::vector<TxtRecord> miracastTxt = {
+        {"container_id", containerId},
         {"VerMgmt", "0x0202"},  // MS-MICE management version (revision 6.0)
         {"VerMin",  "0x0100"},  // MS-MICE minimum version
     };

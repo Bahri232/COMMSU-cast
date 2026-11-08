@@ -210,6 +210,7 @@ int main(int argc, char* argv[]) {
                       "Please open the following ports manually:\n"
                       "  UDP 5353 (mDNS), UDP 1900 (SSDP),\n"
                       "  TCP 7000 (AirPlay), TCP 8009 (Google Cast),\n"
+                      "  TCP 7250 / 7236 / UDP 1028 (Miracast),\n"
                       "  TCP 7400 (AirShow), TCP 7401 (Web Interface)");
         }
         settings.setFirstLaunchComplete();
