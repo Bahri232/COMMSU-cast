@@ -54,7 +54,11 @@ jobs:
 
       - name: Build Android Release APK
         working-directory: sender
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release || {
+            echo "::error::Flutter build failed. Inspecting Gradle error:"
+            cd android && ./gradlew assembleRelease --stacktrace --info
+          }
 
       - name: Prepare APK Artifacts
         run: |
