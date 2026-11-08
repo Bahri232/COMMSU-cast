@@ -216,7 +216,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -237,7 +237,9 @@ jobs:
 
       - name: Build Release APK
         working-directory: sender
-        run: flutter build apk --release
+        run: |
+          flutter create . --platforms=android
+          flutter build apk --release --verbose
 
       - name: Package APK Artifact
         run: |
