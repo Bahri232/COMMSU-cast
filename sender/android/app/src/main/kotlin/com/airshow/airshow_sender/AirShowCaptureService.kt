@@ -365,7 +365,7 @@ class AirShowCaptureService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "AirShow Mirroring",
+                "ComSSU Cast Mirroring",
                 NotificationManager.IMPORTANCE_LOW
             )
             nm.createNotificationChannel(channel)
@@ -378,8 +378,8 @@ class AirShowCaptureService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AirShow Mirroring")
-            .setContentText("Mirroring to $host")
+            .setContentTitle("ComSSU Cast Mirroring")
+            .setContentText("Casting screen to $host")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stopIntent)
             .setOngoing(true)
