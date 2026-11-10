@@ -323,7 +323,7 @@ Item {
                                         Text {
                                             text: "1. In <b>Edge / Chrome</b>: <b>Cast</b> &rarr; <b>Cast screen</b>"
                                             color: "#334155"
-                                            font.pixelSize: 13.5
+                                            font.pixelSize: 14
                                             textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                             wrapMode: Text.WordWrap
@@ -332,14 +332,14 @@ Item {
                                         Text {
                                             text: "2. Or press <font color='#0288D1'><b>Win + K</b></font> (Miracast)"
                                             color: "#334155"
-                                            font.pixelSize: 13.5
+                                            font.pixelSize: 14
                                             textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                         }
                                         Text {
                                             text: "3. Select <font color='#0288D1'><b>CS Society Display</b></font>"
                                             color: "#334155"
-                                            font.pixelSize: 13.5
+                                            font.pixelSize: 14
                                             textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                             wrapMode: Text.WordWrap
@@ -421,21 +421,21 @@ Item {
                                         Text {
                                             text: "1. Open <b>ComSSU Cast</b> or <b>Chrome</b>"
                                             color: "#334155"
-                                            font.pixelSize: 13.5
+                                            font.pixelSize: 14
                                             textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                         }
                                         Text {
                                             text: "2. Tap <font color='#0288D1'><b>Cast / Mirror Screen</b></font>"
                                             color: "#334155"
-                                            font.pixelSize: 13.5
+                                            font.pixelSize: 14
                                             textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                         }
                                         Text {
                                             text: "3. Select <font color='#0288D1'><b>CS Society Display</b></font>"
                                             color: "#334155"
-                                            font.pixelSize: 13.5
+                                            font.pixelSize: 14
                                             textFormat: Text.RichText
                                             font.family: "Segoe UI, Inter, -apple-system, sans-serif"
                                             wrapMode: Text.WordWrap
