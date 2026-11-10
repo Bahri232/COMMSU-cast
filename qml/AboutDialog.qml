@@ -216,7 +216,7 @@ Item {
             // Open-Source Framework Acknowledgment
             Text {
                 width: parent.width
-                text: "Built upon the open-source AirShow framework (GPL-3.0). Core multimedia streaming powered by Qt 6 and GStreamer."
+                text: "Built with love by BAHRI"
                 color: "#64748B"
                 font.pixelSize: 12
                 font.family: "Segoe UI, Inter, -apple-system, sans-serif"
