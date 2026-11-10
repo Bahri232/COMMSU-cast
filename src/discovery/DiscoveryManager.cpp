@@ -119,12 +119,13 @@ bool DiscoveryManager::start() {
 
     // --- _display._tcp (MS-MICE Miracast over Infrastructure — DISC-04, D-04) ---
     // Windows "Connect" app discovers receivers via this mDNS service type.
-    // TXT records: container_id, VerMgmt, and VerMin per [MS-MICE] specification.
-    const std::string containerId = getOrCreateUuid("miracast/container_id");
+    // [MS-MICE] §3.1.3: TXT record key is container_id with a standard hyphenated GUID value (without braces).
+    std::string containerId = getOrCreateUuid("miracast/container_id");
+    if (!containerId.empty() && containerId.front() == '{' && containerId.back() == '}') {
+        containerId = containerId.substr(1, containerId.size() - 2);
+    }
     std::vector<TxtRecord> miracastTxt = {
         {"container_id", containerId},
-        {"VerMgmt", "0x0202"},  // MS-MICE management version (revision 6.0)
-        {"VerMin",  "0x0100"},  // MS-MICE minimum version
     };
     m_advertiser->advertise("_display._tcp", name, kMiracastPort, miracastTxt);
 
