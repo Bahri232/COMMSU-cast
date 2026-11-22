@@ -22,11 +22,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName",      "Computer Science Students' Society (ComSSU) - UniMak\0"
+            VALUE "CompanyName",      "Abdul Malik Barrie (BAHRI) - ComSSU, UniMak\0"
             VALUE "FileDescription",  "ComSSU Wireless Display System\0"
             VALUE "FileVersion",      "1.0.0.0\0"
             VALUE "InternalName",     "ComSSUCast\0"
-            VALUE "LegalCopyright",   "\xA9 2026-2027 Abdul Malik Barrie\0"
+            VALUE "LegalCopyright",   "\xA9 2026-2027 Abdul Malik Barrie (BAHRI)\0"
             VALUE "OriginalFilename", "ComSSUCast.exe\0"
             VALUE "ProductName",      "ComSSU Cast\0"
             VALUE "ProductVersion",   "1.0.0.0\0"

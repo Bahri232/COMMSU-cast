@@ -1,7 +1,7 @@
 ; Inno Setup Script for ComSSU Cast
 #define MyAppName "ComSSU Cast"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "Computer Science Students' Society (ComSSU) - UniMak"
+#define MyAppPublisher "Abdul Malik Barrie (BAHRI) — ComSSU, UniMak"
 #define MyAppURL "https://unimak.edu.sl"
 #define MyAppExeName "ComSSUCast.exe"
 
@@ -13,6 +13,13 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
+AppCopyright=Copyright (C) 2026-2027 Abdul Malik Barrie (BAHRI) - ComSSU, University of Makeni
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=ComSSU Wireless Display System Setup
+VersionInfoVersion=1.0.0.0
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoCopyright=Copyright (C) 2026-2027 Abdul Malik Barrie (BAHRI)
 DefaultDirName={autopf}\ComSSUCast
 DisableProgramGroupPage=yes
 SourceDir=..\..
