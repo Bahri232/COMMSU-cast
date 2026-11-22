@@ -45,20 +45,26 @@ std::string fitUtf8(const std::string& s, size_t maxBytes) {
     return s.substr(0, n);
 }
 
-// "DESKTOP-1234-AirShow": the machine's host name reduced to a DNS label, so
-// SRV records point at a name no other responder on this machine answers for.
-std::string defaultHostLabel() {
-    const QString host = QSysInfo::machineHostName().section(QLatin1Char('.'), 0, 0);
+// Sanitize a display name into a space-free RFC 1123 DNS host label
+// (e.g. "CS Society Display" -> "CS-Society-Display") so SRV target hostnames
+// are always valid space-free .local names ("CS-Society-Display.local").
+std::string sanitizeHostLabel(const std::string& raw) {
     std::string label;
-    for (const QChar c : host) {
-        if (c.unicode() < 128 && c.isLetterOrNumber())
-            label += static_cast<char>(c.unicode());
-        else if (!label.empty() && label.back() != '-')
+    for (unsigned char c : raw) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+            label += static_cast<char>(c);
+        } else if (!label.empty() && label.back() != '-') {
             label += '-';
-        if (label.size() >= 40) break;
+        }
+        if (label.size() >= 60) break;
     }
     while (!label.empty() && label.back() == '-') label.pop_back();
-    return label.empty() ? "ComSSUCast" : label + "-ComSSUCast";
+    return label.empty() ? "CS-Society-Display" : label;
+}
+
+// Default SRV target host label: "CS-Society-Display" -> "CS-Society-Display.local".
+std::string defaultHostLabel() {
+    return sanitizeHostLabel("CS-Society-Display");
 }
 
 bool isUnique(const dns::Record& r) { return r.type != dns::kPtr; }

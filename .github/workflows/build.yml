@@ -226,6 +226,10 @@ jobs:
         # mDNS responder: browse for the receiver over the network.
         shell: pwsh
         run: |
+          if (-not (Test-Path "dist\ComSSUCast\ComSSUMiracastHelper.exe")) {
+              Write-Error "ComSSUMiracastHelper.exe missing from packaged dist/ComSSUCast folder"
+              exit 1
+          }
           $python = (Get-Command python).Source
           $env:PATH = "C:\Windows\System32;C:\Windows"
           $env:QT_FORCE_STDERR_LOGGING = "1"

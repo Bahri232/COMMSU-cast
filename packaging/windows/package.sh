@@ -13,6 +13,15 @@ rm -rf "$OUT"
 mkdir -p "$OUT/lib/gstreamer-1.0"
 
 cp "$BUILD_DIR/ComSSUCast.exe" "$OUT/"
+if [[ ! -f "$BUILD_DIR/ComSSUMiracastHelper.exe" ]]; then
+  powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    -File tools/miracast-helper/build-helper.ps1 \
+    -OutputPath "$(cygpath -w "$BUILD_DIR/ComSSUMiracastHelper.exe")"
+fi
+cp "$BUILD_DIR/ComSSUMiracastHelper.exe" "$OUT/"
+if [[ -f "scripts/setup-windows-miracast.ps1" ]]; then
+  cp "scripts/setup-windows-miracast.ps1" "$OUT/"
+fi
 cp -r "$BUILD_DIR/resources" "$OUT/"
 
 # Qt libraries, platform/TLS plugins and QML runtime.
