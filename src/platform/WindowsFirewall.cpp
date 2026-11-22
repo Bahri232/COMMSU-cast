@@ -62,7 +62,7 @@ HRESULT addAppRule(INetFwRules* pRules, const wchar_t* name, const wchar_t* appP
     pRule->put_Name(bName);
     pRule->put_Description(bDesc);
     pRule->put_ApplicationName(bApp);
-    pRule->put_Protocol(NET_FW_IP_PROTOCOL_ANY);
+    pRule->put_Protocol(static_cast<NET_FW_IP_PROTOCOL>(256)); // 256 means any IP protocol
     pRule->put_Direction(NET_FW_RULE_DIR_IN);
     pRule->put_Action(NET_FW_ACTION_ALLOW);
     pRule->put_Enabled(VARIANT_TRUE);
