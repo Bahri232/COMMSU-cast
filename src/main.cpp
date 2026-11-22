@@ -16,6 +16,9 @@
 #include "protocol/CastHandler.h"
 #include "protocol/DlnaHandler.h"
 #include "protocol/MiracastHandler.h"
+#ifdef _WIN32
+#include "protocol/WindowsMiracastBridge.h"
+#endif
 #include "protocol/AirShowHandler.h"
 #include "protocol/ProtocolManager.h"
 #include "web/WebInterface.h"
@@ -303,7 +306,10 @@ int main(int argc, char* argv[]) {
         // NOTE: addHandler() calls handler->setMediaPipeline(m_pipeline) internally.
     }
 
-    // Miracast (MS-MICE) handler (Phase 8) — Windows wireless display mirroring (MIRA-01)
+    // Miracast wireless display mirroring (Phase 8 / MIRA-01)
+    // On Windows (#ifdef _WIN32): WindowsMiracastBridge launches ComSSUMiracastHelper.exe
+    // (native Windows.Media.Miracast Wi-Fi Direct + Miracast receiver) and defers the
+    // built-in MS-MICE listener on TCP port 7250 unless native Miracast is unavailable.
     {
         auto miracastHandler = std::make_unique<airshow::MiracastHandler>(
             window.connectionBridge());
@@ -314,7 +320,16 @@ int main(int argc, char* argv[]) {
         // MiracastHandler passes m_qmlVideoItem to initMiracastPipeline() at session time.
         // Same deferred-pointer pattern as pipeline.setQmlVideoItem(nullptr) above.
         miracastHandler->setQmlVideoItem(nullptr);
+#ifdef _WIN32
+        auto winMiracastBridge = std::make_unique<airshow::WindowsMiracastBridge>(
+            window.connectionBridge(),
+            &securityManager,
+            &settings,
+            std::move(miracastHandler));
+        protocolManager.addHandler(std::move(winMiracastBridge));
+#else
         protocolManager.addHandler(std::move(miracastHandler));
+#endif
         // NOTE: addHandler() calls handler->setMediaPipeline(m_pipeline) internally.
     }
 

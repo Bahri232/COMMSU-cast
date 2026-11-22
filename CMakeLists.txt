@@ -146,6 +146,7 @@ qt_add_executable(ComSSUCast WIN32
   src/cast/CastStreamingOffer.cpp
   src/cast/CastStreamingReceiver.cpp
   src/protocol/MiracastHandler.cpp
+  src/protocol/WindowsMiracastBridge.cpp
   src/protocol/AirShowHandler.cpp
   ${CAST_PROTO_SRCS}
   src/settings/AppSettings.cpp
@@ -163,6 +164,25 @@ qt_add_executable(ComSSUCast WIN32
 
 if(WIN32)
   set_target_properties(ComSSUCast PROPERTIES WIN32_EXECUTABLE TRUE)
+
+  # Build the native Windows.Media.Miracast helper (ComSSUMiracastHelper.exe)
+  # using Windows' built-in .NET Framework csc.exe + WinRT metadata, placing it
+  # right next to ComSSUCast.exe in the build output directory.
+  set(MIRACAST_HELPER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tools/miracast-helper/ComSSUMiracastHelper.cs")
+  set(MIRACAST_HELPER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/tools/miracast-helper/build-helper.ps1")
+  set(MIRACAST_HELPER_EXE "${CMAKE_CURRENT_BINARY_DIR}/ComSSUMiracastHelper.exe")
+
+  add_custom_command(
+    OUTPUT "${MIRACAST_HELPER_EXE}"
+    COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass
+            -File "${MIRACAST_HELPER_SCRIPT}"
+            -OutputPath "${MIRACAST_HELPER_EXE}"
+    DEPENDS "${MIRACAST_HELPER_SRC}" "${MIRACAST_HELPER_SCRIPT}"
+    COMMENT "Building native Windows Miracast helper (ComSSUMiracastHelper.exe)"
+    VERBATIM
+  )
+  add_custom_target(ComSSUMiracastHelper ALL DEPENDS "${MIRACAST_HELPER_EXE}")
+  add_dependencies(ComSSUCast ComSSUMiracastHelper)
 endif()
 
 # QML lives under Qt's standard :/qt/qml/ resource prefix (on the default import

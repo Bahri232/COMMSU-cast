@@ -14,24 +14,25 @@ echo Preset:   %PRESET%
 echo Build:    %BUILD_DIR%
 echo.
 
-REM --- Check MSYS2 ---
-if not exist "C:\msys64\mingw64\bin\gcc.exe" (
-    echo ERROR: MSYS2 MinGW-64 not found at C:\msys64
+REM --- Check MSYS2 (prefer UCRT64 matching CI, fall back to MINGW64) ---
+set "MSYS2_BIN="
+if exist "C:\msys64\ucrt64\bin\gcc.exe" (
+    set "MSYS2_BIN=C:\msys64\ucrt64\bin"
+) else if exist "C:\msys64\mingw64\bin\gcc.exe" (
+    set "MSYS2_BIN=C:\msys64\mingw64\bin"
+)
+
+if "%MSYS2_BIN%"=="" (
+    echo ERROR: MSYS2 UCRT64/MinGW-64 not found at C:\msys64
     echo.
-    echo Install MSYS2 from https://www.msys2.org/ then run:
-    echo   pacman -S mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
-    echo   pacman -S mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-declarative
-    echo   pacman -S mingw-w64-x86_64-qt6-networkauth
-    echo   pacman -S mingw-w64-x86_64-gstreamer mingw-w64-x86_64-gst-plugins-base
-    echo   pacman -S mingw-w64-x86_64-gst-plugins-good mingw-w64-x86_64-gst-plugins-bad
-    echo   pacman -S mingw-w64-x86_64-gst-libav
-    echo   pacman -S mingw-w64-x86_64-openssl mingw-w64-x86_64-libupnp
-    echo   pacman -S mingw-w64-x86_64-libplist mingw-w64-x86_64-protobuf
-    echo.
-    echo For mDNS discovery (AirPlay/Cast), install one of:
-    echo   - iTunes       https://www.apple.com/itunes/
-    echo   - iCloud       https://www.microsoft.com/store/apps/icloud
-    echo   - Bonjour Print Services  https://support.apple.com/kb/DL999
+    echo Install MSYS2 from https://www.msys2.org/ then run in MSYS2 UCRT64 shell:
+    echo   pacman -S mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+    echo   pacman -S mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative
+    echo   pacman -S mingw-w64-ucrt-x86_64-qt6-tools mingw-w64-ucrt-x86_64-gstreamer mingw-w64-ucrt-x86_64-gst-plugins-base
+    echo   pacman -S mingw-w64-ucrt-x86_64-gst-plugins-good mingw-w64-ucrt-x86_64-gst-plugins-bad
+    echo   pacman -S mingw-w64-ucrt-x86_64-gst-plugins-ugly mingw-w64-ucrt-x86_64-gst-libav
+    echo   pacman -S mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-libplist mingw-w64-ucrt-x86_64-protobuf
+    echo   pacman -S mingw-w64-ucrt-x86_64-gtest mingw-w64-ucrt-x86_64-spdlog
     exit /b 1
 )
 
@@ -46,7 +47,7 @@ if not exist "%WINDIR%\System32\dnssd.dll" (
 )
 
 REM Add MSYS2 to PATH for this session
-set "PATH=C:\msys64\mingw64\bin;%PATH%"
+set "PATH=%MSYS2_BIN%;%PATH%"
 
 REM --- Check tools ---
 where cmake >nul 2>&1 || (
