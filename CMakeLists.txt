@@ -93,6 +93,9 @@ pkg_check_modules(PLIST REQUIRED IMPORTED_TARGET libplist-2.0)
 # (mirrors the order in vendor/uxplay/CMakeLists.txt: llhttp, playfair, lib)
 # Pre-set OPENSSL_FOUND so UxPlay's find_package(OpenSSL 1.1.1) uses already-found OpenSSL
 set(OPENSSL_FOUND TRUE)
+# Disable UxPlay's default -march=native so binaries built on AVX-512 CI runners
+# do not crash with STATUS_ILLEGAL_INSTRUCTION (0xc000001d) on consumer CPUs.
+set(NO_MARCH_NATIVE ON CACHE BOOL "Disable -march=native in UxPlay for portable binaries" FORCE)
 # Windows: UxPlay's CMake insists on finding dns_sd.h even though AirShow doesn't
 # build the file that uses it (see below) — point it at the vendored copy
 # instead of requiring the Bonjour SDK.

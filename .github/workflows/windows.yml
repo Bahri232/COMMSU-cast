@@ -71,7 +71,7 @@ jobs:
           done
 
       - name: Configure CMake
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_MARCH_NATIVE=ON
 
       - name: Build ComSSUCast.exe & ComSSUMiracastHelper.exe
         run: cmake --build build --target ComSSUCast -- -k 0

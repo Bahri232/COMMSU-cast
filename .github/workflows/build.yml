@@ -203,7 +203,7 @@ jobs:
 
       - name: Configure
         # MSYS2 has no libupnp package; CMake builds pupnp from source.
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNO_MARCH_NATIVE=ON
 
       - name: Build
         # -k 0: report every compile error in one run
