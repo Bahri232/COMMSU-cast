@@ -93,29 +93,18 @@ jobs:
 
       - name: Sign & Build Windows Setup Installer (.exe) and Portable (.zip)
         shell: pwsh
-        env:
-          WINDOWS_CERT_PFX_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
-          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
           $pfxPath = Join-Path $env:RUNNER_TEMP "ComSSUCast-CodeSign.pfx"
           $cerPath = "dist\ComSSUCast-Publisher.cer"
-          if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_PFX_B64) -and -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_PASSWORD)) {
-              Write-Host "Using repository secret code-signing certificate..."
-              [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_B64))
-              $pwdPlain = $env:WINDOWS_CERT_PASSWORD
-              $certObj = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxPath, $pwdPlain)
-              [IO.File]::WriteAllBytes($cerPath, $certObj.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
-              $certObj.Dispose()
-          } else {
-              Write-Host "Generating self-signed Authenticode certificate for Abdul Malik Barrie (ComSSU - UniMak)..."
-              $pwdPlain = "ComSSUCast2026!"
-              $secPwd = ConvertTo-SecureString -String $pwdPlain -Force -AsPlainText
-              & .\packaging\windows\create-self-signed-cert.ps1 `
-                  -Subject "CN=Abdul Malik Barrie (ComSSU - UniMak), O=Computer Science Students' Society (ComSSU) - UniMak, L=Makeni, C=SL" `
-                  -OutputDir $env:RUNNER_TEMP `
-                  -PublicCerPath $cerPath `
-                  -Password $secPwd
-          }
+          Write-Host "Generating self-signed Authenticode certificate for Abdul Malik Barrie (ComSSU - UniMak)..."
+          $pwdPlain = "ComSSUCast2026!"
+          $secPwd = ConvertTo-SecureString -String $pwdPlain -Force -AsPlainText
+          & .\packaging\windows\create-self-signed-cert.ps1 `
+              -Subject "CN=Abdul Malik Barrie (ComSSU - UniMak), O=Computer Science Students' Society (ComSSU) - UniMak, L=Makeni, C=SL" `
+              -OutputDir $env:RUNNER_TEMP `
+              -PublicCerPath $cerPath `
+              -Password $secPwd
+
           # 1. Sign inner executables and bundle trust script + public certificate
           & .\packaging\windows\sign-file.ps1 -FilePath "dist\ComSSUCast\ComSSUCast.exe" -PfxPath $pfxPath -PfxPassword $pwdPlain
           & .\packaging\windows\sign-file.ps1 -FilePath "dist\ComSSUCast\ComSSUMiracastHelper.exe" -PfxPath $pfxPath -PfxPassword $pwdPlain
