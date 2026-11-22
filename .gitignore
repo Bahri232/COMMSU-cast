@@ -4,3 +4,7 @@ build/
 CMakeUserPresets.json
 *.deb
 dist/
+*.pfx
+*.p12
+*.key
+certs/
