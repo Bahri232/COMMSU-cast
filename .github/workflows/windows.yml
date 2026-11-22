@@ -1,0 +1,109 @@
+name: Build Windows EXE Only
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'CMakeLists.txt'
+      - 'ComSSUCast.rc'
+      - 'src/**'
+      - 'qml/**'
+      - 'tools/miracast-helper/**'
+      - 'scripts/setup-windows-miracast.ps1'
+      - 'packaging/windows/**'
+      - '.github/workflows/windows.yml'
+
+jobs:
+  windows-exe:
+    name: Windows EXE & Setup Installer (x64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup MSYS2 UCRT64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          cache: true
+
+      - name: Install MSYS2 dependencies
+        shell: msys2 {0}
+        run: |
+          grep -q "DisableDownloadTimeout" /etc/pacman.conf || echo "DisableDownloadTimeout" >> /etc/pacman.conf
+          sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf || true
+          for i in 1 2 3; do
+            if pacman -S --needed --noconfirm --disable-download-timeout \
+              mingw-w64-ucrt-x86_64-toolchain \
+              mingw-w64-ucrt-x86_64-cmake \
+              mingw-w64-ucrt-x86_64-ninja \
+              mingw-w64-ucrt-x86_64-pkgconf \
+              mingw-w64-ucrt-x86_64-qt6-base \
+              mingw-w64-ucrt-x86_64-qt6-declarative \
+              mingw-w64-ucrt-x86_64-qt6-tools \
+              mingw-w64-ucrt-x86_64-gstreamer \
+              mingw-w64-ucrt-x86_64-gst-plugins-base \
+              mingw-w64-ucrt-x86_64-gst-plugins-good \
+              mingw-w64-ucrt-x86_64-gst-plugins-bad \
+              mingw-w64-ucrt-x86_64-gst-plugins-ugly \
+              mingw-w64-ucrt-x86_64-gst-libav \
+              mingw-w64-ucrt-x86_64-openssl \
+              mingw-w64-ucrt-x86_64-libplist \
+              mingw-w64-ucrt-x86_64-protobuf \
+              mingw-w64-ucrt-x86_64-gtest \
+              mingw-w64-ucrt-x86_64-spdlog \
+              zip; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "Pacman download failed after 3 attempts." >&2
+              exit 1
+            fi
+            echo "Pacman download failed, retrying in 5s ($i/3)..."
+            sleep 5
+          done
+
+      - name: Configure CMake
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build ComSSUCast.exe & ComSSUMiracastHelper.exe
+        run: cmake --build build --target ComSSUCast -- -k 0
+
+      - name: Package Windows Bundle
+        run: |
+          packaging/windows/package.sh build dist/ComSSUCast
+          (cd dist && zip -qr ComSSUCast-windows-x64.zip ComSSUCast)
+
+      - name: Verify Packaged Executables
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\ComSSUCast\ComSSUCast.exe")) {
+              throw "ComSSUCast.exe missing from dist\ComSSUCast"
+          }
+          if (-not (Test-Path "dist\ComSSUCast\ComSSUMiracastHelper.exe")) {
+              throw "ComSSUMiracastHelper.exe missing from dist\ComSSUCast"
+          }
+          Write-Host "Verified ComSSUCast.exe and ComSSUMiracastHelper.exe in dist\ComSSUCast"
+
+      - name: Build Windows Setup Installer (.exe)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\installer.iss /Odist
+          if (-not (Test-Path "dist\ComSSUCast-windows-x64-Setup.exe")) {
+              throw "ComSSUCast-windows-x64-Setup.exe failed to build."
+          }
+
+      - name: Upload Windows EXE Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ComSSUCast-Windows-EXE
+          path: |
+            dist/ComSSUCast-windows-x64-Setup.exe
+            dist/ComSSUCast-windows-x64.zip
