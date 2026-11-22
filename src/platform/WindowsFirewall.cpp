@@ -62,7 +62,8 @@ HRESULT addAppRule(INetFwRules* pRules, const wchar_t* name, const wchar_t* appP
     pRule->put_Name(bName);
     pRule->put_Description(bDesc);
     pRule->put_ApplicationName(bApp);
-    pRule->put_Protocol(NET_FW_IP_PROTOCOL_ANY);
+    // 256 = NET_FW_IP_PROTOCOL_ANY (omitted from MinGW-w64's netfw.h enum)
+    pRule->put_Protocol(static_cast<NET_FW_IP_PROTOCOL>(256));
     pRule->put_Direction(NET_FW_RULE_DIR_IN);
     pRule->put_Action(NET_FW_ACTION_ALLOW);
     pRule->put_Enabled(VARIANT_TRUE);
