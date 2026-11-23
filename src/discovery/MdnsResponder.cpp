@@ -62,9 +62,68 @@ std::string sanitizeHostLabel(const std::string& raw) {
     return label.empty() ? "CS-Society-Display" : label;
 }
 
-// Default SRV target host label: "CS-Society-Display" -> "CS-Society-Display.local".
+// "DESKTOP-1234-ComSSUCast": the machine's host name reduced to a DNS label, so
+// SRV records point at a unique .local name no other responder on this machine answers for.
 std::string defaultHostLabel() {
-    return sanitizeHostLabel("CS-Society-Display");
+    const QString host = QSysInfo::machineHostName().section(QLatin1Char('.'), 0, 0);
+    std::string label = sanitizeHostLabel(host.toStdString());
+    if (label.size() > 40) {
+        label.resize(40);
+        while (!label.empty() && label.back() == '-') label.pop_back();
+    }
+    return label.empty() ? "CS-Society-Display" : label + "-ComSSUCast";
+}
+
+// Returns true for virtual Wi-Fi Direct, Bluetooth PAN, VPN tunnel, or hypervisor
+// adapters that must not be advertised as LAN mDNS A-record targets.
+bool isVirtualOrTunnelInterface(const QNetworkInterface& net) {
+    const QString name  = net.name();
+    const QString human = net.humanReadableName();
+
+    const QStringList vpnPrefixes = {
+        QStringLiteral("tun"),
+        QStringLiteral("wg"),
+        QStringLiteral("vpn"),
+        QStringLiteral("ppp"),
+        QStringLiteral("tap"),
+        QStringLiteral("vEthernet"),
+        QStringLiteral("Local Area Connection*")
+    };
+    for (const QString& prefix : vpnPrefixes) {
+        if (name.startsWith(prefix, Qt::CaseInsensitive) ||
+            human.startsWith(prefix, Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+
+    const QStringList virtualKeywords = {
+        QStringLiteral("Wi-Fi Direct"),
+        QStringLiteral("Local Area Connection*"),
+        QStringLiteral("Bluetooth"),
+        QStringLiteral("VirtualBox"),
+        QStringLiteral("VMware"),
+        QStringLiteral("Hyper-V"),
+        QStringLiteral("Wintun"),
+        QStringLiteral("WireGuard")
+    };
+    for (const QString& kw : virtualKeywords) {
+        if (name.contains(kw, Qt::CaseInsensitive) ||
+            human.contains(kw, Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Returns true if an IPv4 address is a usable LAN address (not 169.254.x.x link-local
+// and not 192.168.137.1 Windows ICS / Wi-Fi Direct Group Owner address).
+bool isPreferredLanIpv4(const QHostAddress& ip) {
+    if (ip.protocol() != QAbstractSocket::IPv4Protocol) return false;
+    if (ip.isLoopback() || ip.isLinkLocal()) return false;
+    const quint32 v4 = ip.toIPv4Address();
+    // 192.168.137.1 (0xC0A88901) is Windows Mobile Hotspot / Wi-Fi Direct GO
+    if (v4 == 0xC0A88901u) return false;
+    return true;
 }
 
 bool isUnique(const dns::Record& r) { return r.type != dns::kPtr; }
@@ -642,15 +701,41 @@ private:
     // ── Interfaces ───────────────────────────────────────────────────────────
 
     void rescanInterfaces() {
-        std::vector<Iface> found;
-        for (const QNetworkInterface& net : QNetworkInterface::allInterfaces()) {
+        // First pass: check if the machine has at least one preferred LAN IPv4 address
+        // on a physical (non-virtual/non-Wi-Fi-Direct) interface.
+        bool hasPreferredLan = false;
+        const auto allNets = QNetworkInterface::allInterfaces();
+        for (const QNetworkInterface& net : allNets) {
             const auto flags = net.flags();
             if (!(flags & QNetworkInterface::IsUp) || !(flags & QNetworkInterface::IsRunning) ||
                 !(flags & QNetworkInterface::CanMulticast) || (flags & QNetworkInterface::IsLoopBack))
                 continue;
+            if (isVirtualOrTunnelInterface(net)) continue;
+            for (const auto& e : net.addressEntries()) {
+                if (isPreferredLanIpv4(e.ip())) {
+                    hasPreferredLan = true;
+                    break;
+                }
+            }
+            if (hasPreferredLan) break;
+        }
+
+        std::vector<Iface> found;
+        for (const QNetworkInterface& net : allNets) {
+            const auto flags = net.flags();
+            if (!(flags & QNetworkInterface::IsUp) || !(flags & QNetworkInterface::IsRunning) ||
+                !(flags & QNetworkInterface::CanMulticast) || (flags & QNetworkInterface::IsLoopBack))
+                continue;
+            // Skip Wi-Fi Direct virtual adapters, Bluetooth PAN, and VPN tunnels
+            // so their 169.254.x.x / 192.168.137.1 addresses never poison LAN mDNS A records.
+            if (hasPreferredLan && isVirtualOrTunnelInterface(net))
+                continue;
             Iface i{net, {}};
-            for (const auto& e : net.addressEntries())
-                if (e.ip().protocol() == QAbstractSocket::IPv4Protocol) i.v4.push_back(e);
+            for (const auto& e : net.addressEntries()) {
+                if (e.ip().protocol() != QAbstractSocket::IPv4Protocol) continue;
+                if (hasPreferredLan && !isPreferredLanIpv4(e.ip())) continue;
+                i.v4.push_back(e);
+            }
             if (!i.v4.empty()) found.push_back(std::move(i));
         }
 

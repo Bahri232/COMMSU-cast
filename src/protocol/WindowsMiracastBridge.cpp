@@ -213,10 +213,18 @@ void WindowsMiracastBridge::processJsonLine(const QByteArray& line) {
     const QString     event = obj.value(QStringLiteral("event")).toString();
 
     if (event == QStringLiteral("status")) {
-        const bool    available  = obj.value(QStringLiteral("available")).toBool(false);
-        const QString statusStr  = obj.value(QStringLiteral("status")).toString();
-        const QString wifiStatus = obj.value(QStringLiteral("wifiStatus")).toString();
-        const QString reason     = obj.value(QStringLiteral("reason")).toString();
+        const bool    available       = obj.value(QStringLiteral("available")).toBool(false);
+        const QString statusStr       = obj.value(QStringLiteral("status")).toString();
+        const QString wifiStatus      = obj.value(QStringLiteral("wifiStatus")).toString();
+        const QString listeningStatus = obj.value(QStringLiteral("listeningStatus")).toString();
+        const QString reason          = obj.value(QStringLiteral("reason")).toString();
+
+        qInfo("WindowsMiracastBridge: MiracastReceiverStatus available=%s status='%s' wifiStatus='%s' listeningStatus='%s' reason='%s'",
+              available ? "true" : "false",
+              qPrintable(statusStr),
+              qPrintable(wifiStatus),
+              qPrintable(listeningStatus),
+              qPrintable(reason));
 
         if (available && statusStr == QStringLiteral("listening")) {
             m_nativeActive = true;
@@ -226,13 +234,19 @@ void WindowsMiracastBridge::processJsonLine(const QByteArray& line) {
                 m_fallbackStarted = false;
             }
             qInfo("WindowsMiracastBridge: native Windows.Media.Miracast receiver listening as '%s' "
-                  "(WiFiStatus=%s, MS-MICE port 7250 reserved for OS receiver)",
+                  "(WiFiStatus=%s, ListeningStatus=%s, MS-MICE port 7250 reserved for OS receiver)",
                   qPrintable(obj.value(QStringLiteral("friendlyName")).toString()),
-                  qPrintable(wifiStatus));
+                  qPrintable(wifiStatus),
+                  qPrintable(listeningStatus));
         } else {
             m_nativeActive = false;
             startFallbackMice(reason.isEmpty() ? statusStr : reason);
         }
+    }
+    else if (event == QStringLiteral("receiver_status_changed")) {
+        qInfo("WindowsMiracastBridge: receiver_status_changed listeningStatus='%s' wifiStatus='%s'",
+              qPrintable(obj.value(QStringLiteral("listeningStatus")).toString()),
+              qPrintable(obj.value(QStringLiteral("wifiStatus")).toString()));
     }
     else if (event == QStringLiteral("connection_created")) {
         const QString requestId  = obj.value(QStringLiteral("requestId")).toString();
@@ -241,8 +255,9 @@ void WindowsMiracastBridge::processJsonLine(const QByteArray& line) {
         const QString macAddress = obj.value(QStringLiteral("macAddress")).toString();
         const QString pin        = obj.value(QStringLiteral("pin")).toString();
 
-        qInfo("WindowsMiracastBridge: incoming Miracast connection from '%s' (MAC=%s, PIN=%s)",
-              qPrintable(deviceName), qPrintable(macAddress), qPrintable(pin));
+        qInfo("WindowsMiracastBridge: ConnectionCreated from '%s' (MAC=%s, PIN=%s, requestId=%s)",
+              qPrintable(deviceName), qPrintable(macAddress),
+              qPrintable(pin), qPrintable(requestId));
 
         if (!pin.isEmpty() && m_settings) {
             m_settings->setPin(pin);
@@ -254,27 +269,59 @@ void WindowsMiracastBridge::processJsonLine(const QByteArray& line) {
                 deviceName,
                 QStringLiteral("Miracast"),
                 deviceId,
-                [this, requestId](bool approved) {
+                [this, requestId, deviceName](bool approved) {
+                    qInfo("WindowsMiracastBridge: sending approval decision for '%s' (requestId=%s): %s",
+                          qPrintable(deviceName), qPrintable(requestId),
+                          approved ? "APPROVED" : "DENIED");
                     sendApprovalDecision(requestId, approved);
                 });
         } else {
             sendApprovalDecision(requestId, true);
         }
     }
+    else if (event == QStringLiteral("connection_approved")) {
+        qInfo("WindowsMiracastBridge: helper confirmed connection_approved for '%s' (requestId=%s)",
+              qPrintable(obj.value(QStringLiteral("deviceName")).toString()),
+              qPrintable(obj.value(QStringLiteral("requestId")).toString()));
+    }
+    else if (event == QStringLiteral("connection_denied")) {
+        qInfo("WindowsMiracastBridge: helper confirmed connection_denied for '%s' (requestId=%s, reason=%s)",
+              qPrintable(obj.value(QStringLiteral("deviceName")).toString()),
+              qPrintable(obj.value(QStringLiteral("requestId")).toString()),
+              qPrintable(obj.value(QStringLiteral("reason")).toString()));
+        if (m_connectionBridge && m_connectionBridge->pendingProtocol().compare(
+                QStringLiteral("Miracast"), Qt::CaseInsensitive) == 0) {
+            m_connectionBridge->clearApprovalRequest();
+        }
+    }
     else if (event == QStringLiteral("media_source_created")) {
         const QString deviceName = obj.value(QStringLiteral("deviceName")).toString(
             QStringLiteral("Wireless Display Device"));
-        qInfo("WindowsMiracastBridge: Miracast streaming started from '%s'",
-              qPrintable(deviceName));
+        const QString macAddress = obj.value(QStringLiteral("macAddress")).toString();
+        qInfo("WindowsMiracastBridge: MediaSourceCreated — Miracast streaming started from '%s' (MAC=%s)",
+              qPrintable(deviceName), qPrintable(macAddress));
         if (m_connectionBridge) {
             m_connectionBridge->setConnected(true, deviceName, QStringLiteral("Miracast"));
         }
     }
+    else if (event == QStringLiteral("media_opened")) {
+        qInfo("WindowsMiracastBridge: Miracast MediaPlayer opened media stream and started playback");
+    }
     else if (event == QStringLiteral("disconnected")) {
         const QString deviceName = obj.value(QStringLiteral("deviceName")).toString();
-        qInfo("WindowsMiracastBridge: Miracast session ended (%s)", qPrintable(deviceName));
+        const QString reason     = obj.value(QStringLiteral("reason")).toString();
+        qInfo("WindowsMiracastBridge: Disconnected — Miracast session ended (device='%s', reason='%s')",
+              qPrintable(deviceName), qPrintable(reason));
         if (m_connectionBridge) {
-            m_connectionBridge->setConnected(false);
+            if (m_connectionBridge->pendingProtocol().compare(
+                    QStringLiteral("Miracast"), Qt::CaseInsensitive) == 0) {
+                m_connectionBridge->clearApprovalRequest();
+            }
+            if (m_connectionBridge->protocol().isEmpty() ||
+                m_connectionBridge->protocol().compare(
+                    QStringLiteral("Miracast"), Qt::CaseInsensitive) == 0) {
+                m_connectionBridge->setConnected(false);
+            }
         }
     }
     else if (event == QStringLiteral("error")) {

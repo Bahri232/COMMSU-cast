@@ -49,7 +49,10 @@ bool DiscoveryManager::start() {
     }
 
     const std::string name = m_settings->receiverName().toStdString();
-    const std::string mac  = readMacAddress();
+    if (m_deviceId.empty()) {
+        m_deviceId = readMacAddress();
+    }
+    const std::string mac  = m_deviceId;
     const std::string pi   = getOrCreateUuid("airplay/pi");
     const std::string castId = getOrCreateUuid("cast/id");
 
@@ -65,7 +68,9 @@ bool DiscoveryManager::start() {
         {"pk",       pkPlaceholder},
         {"pi",       pi},
     };
-    m_advertiser->advertise("_airplay._tcp", name, kAirPlayPort, airplayTxt);
+    const bool airplayOk = m_advertiser->advertise("_airplay._tcp", name, kAirPlayPort, airplayTxt);
+    g_message("DiscoveryManager: mDNS register _airplay._tcp name='%s' port=%u deviceid=%s pi=%s ok=%s",
+              name.c_str(), kAirPlayPort, mac.c_str(), pi.c_str(), airplayOk ? "true" : "false");
 
     // --- _raop._tcp (DISC-01 — iOS audio/legacy discovery) ---
     // Service name format for RAOP: "<MAC>@<ReceiverName>"
@@ -87,7 +92,9 @@ bool DiscoveryManager::start() {
         {"pk",      pkPlaceholder},
         {"ft",      "0x5A7FFEE6,0x1E"},
     };
-    m_advertiser->advertise("_raop._tcp", raopName, kAirPlayPort, raopTxt);
+    const bool raopOk = m_advertiser->advertise("_raop._tcp", raopName, kAirPlayPort, raopTxt);
+    g_message("DiscoveryManager: mDNS register _raop._tcp name='%s' port=%u ok=%s",
+              raopName.c_str(), kAirPlayPort, raopOk ? "true" : "false");
 
     // --- _googlecast._tcp (DISC-02) ---
     // Strip hyphens and braces from UUID — Cast id must be exactly 32 bare hex chars.
@@ -120,14 +127,29 @@ bool DiscoveryManager::start() {
     // --- _display._tcp (MS-MICE Miracast over Infrastructure — DISC-04, D-04) ---
     // Windows "Connect" app discovers receivers via this mDNS service type.
     // [MS-MICE] §3.1.3: TXT record key is container_id with a standard hyphenated GUID value (without braces).
-    std::string containerId = getOrCreateUuid("miracast/container_id");
+    std::string containerId;
+#ifdef _WIN32
+    {
+        QSettings sysInfo(QStringLiteral("HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation"),
+                          QSettings::NativeFormat);
+        const QString hwId = sysInfo.value(QStringLiteral("ComputerHardwareId")).toString().trimmed();
+        if (!hwId.isEmpty()) {
+            containerId = hwId.toStdString();
+        }
+    }
+#endif
+    if (containerId.empty()) {
+        containerId = getOrCreateUuid("miracast/container_id");
+    }
     if (!containerId.empty() && containerId.front() == '{' && containerId.back() == '}') {
         containerId = containerId.substr(1, containerId.size() - 2);
     }
     std::vector<TxtRecord> miracastTxt = {
         {"container_id", containerId},
     };
-    m_advertiser->advertise("_display._tcp", name, kMiracastPort, miracastTxt);
+    const bool displayOk = m_advertiser->advertise("_display._tcp", name, kMiracastPort, miracastTxt);
+    g_message("DiscoveryManager: mDNS register _display._tcp name='%s' port=%u container_id=%s ok=%s",
+              name.c_str(), kMiracastPort, containerId.c_str(), displayOk ? "true" : "false");
 
     // --- _airshow._tcp (RECV-02 -- AirShow companion sender discovery) ---
     std::vector<TxtRecord> airshowTxt = {
@@ -162,7 +184,10 @@ bool DiscoveryManager::updateTxtRecord(const std::string& serviceType,
         g_warning("DiscoveryManager::updateTxtRecord — advertiser not running");
         return false;
     }
-    return m_advertiser->updateTxtRecord(serviceType, key, value);
+    const bool ok = m_advertiser->updateTxtRecord(serviceType, key, value);
+    g_message("DiscoveryManager: updated TXT record service='%s' key='%s' value='%s' ok=%s",
+              serviceType.c_str(), key.c_str(), value.c_str(), ok ? "true" : "false");
+    return ok;
 }
 
 bool DiscoveryManager::isRunning() const {
@@ -170,6 +195,9 @@ bool DiscoveryManager::isRunning() const {
 }
 
 std::string DiscoveryManager::deviceId() const {
+    if (!m_deviceId.empty()) {
+        return m_deviceId;
+    }
     return readMacAddress();
 }
 
@@ -231,20 +259,53 @@ std::string DiscoveryManager::readMacAddress() {
     }
 
     if (ret == NO_ERROR) {
-        for (auto* adapter = addrs; adapter != nullptr; adapter = adapter->Next) {
-            // Skip loopback and tunnel adapters
-            if (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
-            if (adapter->IfType == IF_TYPE_TUNNEL) continue;
-            if (adapter->PhysicalAddressLength != 6) continue;
-            // Skip adapters that are not up
-            if (adapter->OperStatus != IfOperStatusUp) continue;
+        auto isVirtualAdapter = [](const IP_ADAPTER_ADDRESSES* a) -> bool {
+            const auto containsInsensitive = [](const wchar_t* haystack, const wchar_t* needle) -> bool {
+                if (!haystack || !needle) return false;
+                const QString h = QString::fromWCharArray(haystack);
+                const QString n = QString::fromWCharArray(needle);
+                return h.contains(n, Qt::CaseInsensitive);
+            };
+            const wchar_t* keywords[] = {
+                L"Wi-Fi Direct", L"Local Area Connection*", L"Bluetooth",
+                L"Virtual", L"VMware", L"VirtualBox", L"Hyper-V",
+                L"TAP-", L"Wintun", L"WireGuard", L"Loopback"
+            };
+            for (const wchar_t* kw : keywords) {
+                if (containsInsensitive(a->Description, kw) ||
+                    containsInsensitive(a->FriendlyName, kw)) {
+                    return true;
+                }
+            }
+            return false;
+        };
 
-            unsigned char* mac = adapter->PhysicalAddress;
+        auto formatMac = [](const unsigned char* mac) -> std::string {
             char result[18];
             snprintf(result, sizeof(result),
                      "%02X:%02X:%02X:%02X:%02X:%02X",
                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
             return result;
+        };
+
+        // Pass 1: Physical Ethernet (6) or Wi-Fi (71) adapter that is UP and not a virtual/Wi-Fi Direct adapter
+        for (auto* adapter = addrs; adapter != nullptr; adapter = adapter->Next) {
+            if (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+            if (adapter->IfType == IF_TYPE_TUNNEL) continue;
+            if (adapter->PhysicalAddressLength != 6) continue;
+            if (adapter->OperStatus != IfOperStatusUp) continue;
+            if (adapter->IfType != 6 && adapter->IfType != 71) continue;
+            if (isVirtualAdapter(adapter)) continue;
+            return formatMac(adapter->PhysicalAddress);
+        }
+
+        // Pass 2: Any UP non-loopback, non-tunnel adapter
+        for (auto* adapter = addrs; adapter != nullptr; adapter = adapter->Next) {
+            if (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+            if (adapter->IfType == IF_TYPE_TUNNEL) continue;
+            if (adapter->PhysicalAddressLength != 6) continue;
+            if (adapter->OperStatus != IfOperStatusUp) continue;
+            return formatMac(adapter->PhysicalAddress);
         }
     }
 

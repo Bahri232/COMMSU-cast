@@ -51,4 +51,12 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""ComSSUCast Application"""; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""ComSSUCast Application"" dir=in action=allow program=""{app}\{#MyAppExeName}"" profile=private,domain,public enable=yes"; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""ComSSUMiracastHelper Application"""; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""ComSSUMiracastHelper Application"" dir=in action=allow program=""{app}\ComSSUMiracastHelper.exe"" profile=private,domain,public enable=yes"; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""ComSSUCast Windows CastSrv"""; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""ComSSUCast Windows CastSrv"" dir=in action=allow program=""{sys}\CastSrv.exe"" profile=private,domain,public enable=yes"; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""ComSSUCast Windows WUDFHost"""; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""ComSSUCast Windows WUDFHost"" dir=in action=allow program=""{sys}\WUDFHost.exe"" profile=private,domain,public enable=yes"; Flags: runhidden
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

@@ -134,42 +134,90 @@ $searchDirs += @(
     (Split-Path -Parent $PSScriptRoot),
     (Join-Path (Split-Path -Parent $PSScriptRoot) "dist\ComSSUCast"),
     (Join-Path (Split-Path -Parent $PSScriptRoot) "build"),
+    (Join-Path (Split-Path -Parent $PSScriptRoot) "build\Release"),
+    (Join-Path (Split-Path -Parent $PSScriptRoot) "build\Debug"),
     (Join-Path (Split-Path -Parent $PSScriptRoot) "build\windows-debug"),
     (Join-Path (Split-Path -Parent $PSScriptRoot) "tools\miracast-helper"),
-    "$env:ProgramFiles\ComSSUCast"
+    "$env:ProgramFiles\ComSSUCast",
+    "$env:LOCALAPPDATA\Programs\ComSSUCast"
 )
 
-function Find-BinaryPath([string]$exeName) {
+function Find-AllBinaryPaths([string]$exeName) {
+    $found = New-Object System.Collections.Generic.List[string]
     foreach ($dir in $searchDirs) {
         if ($dir -and (Test-Path (Join-Path $dir $exeName))) {
-            return (Resolve-Path (Join-Path $dir $exeName)).Path
+            $resolved = (Resolve-Path (Join-Path $dir $exeName)).Path
+            if (-not $found.Contains($resolved)) {
+                $found.Add($resolved)
+            }
         }
     }
-    return $null
+    return $found
 }
 
-$mainExePath   = Find-BinaryPath "ComSSUCast.exe"
-$helperExePath = Find-BinaryPath "ComSSUMiracastHelper.exe"
+$mainExePaths   = Find-AllBinaryPaths "ComSSUCast.exe"
+$helperExePaths = Find-AllBinaryPaths "ComSSUMiracastHelper.exe"
+
+# Always include the default Inno Setup install paths in C:\Program Files\ComSSUCast
+# even if setup-windows-miracast.ps1 is run before ComSSUCast-windows-x64-Setup.exe is installed.
+$defaultInstalledMain   = "$env:ProgramFiles\ComSSUCast\ComSSUCast.exe"
+$defaultInstalledHelper = "$env:ProgramFiles\ComSSUCast\ComSSUMiracastHelper.exe"
+if (-not $mainExePaths.Contains($defaultInstalledMain)) {
+    $mainExePaths.Add($defaultInstalledMain)
+}
+if (-not $helperExePaths.Contains($defaultInstalledHelper)) {
+    $helperExePaths.Add($defaultInstalledHelper)
+}
 
 # Remove any stale ComSSUCast firewall rules before re-creating clean ones
 Get-NetFirewallRule -DisplayName "ComSSUCast*" -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
 
-if ($mainExePath) {
-    New-NetFirewallRule -DisplayName "ComSSUCast Application (Inbound)" `
-        -Direction Inbound -Action Allow -Program $mainExePath `
-        -Profile Private,Domain,Public -Enabled True | Out-Null
-    Write-Host "  Allowed executable: $mainExePath"
+# Ensure any auto-created Windows Firewall query rules for comssucast cover Private, Domain, and Public
+Get-NetFirewallRule -ErrorAction SilentlyContinue |
+    Where-Object { $_.DisplayName -match "comssucast" } |
+    ForEach-Object {
+        Set-NetFirewallRule -Name $_.Name -Action Allow -Enabled True -Profile Private,Domain,Public -ErrorAction SilentlyContinue
+    }
+
+if ($mainExePaths.Count -gt 0) {
+    $idx = 1
+    foreach ($exePath in $mainExePaths) {
+        New-NetFirewallRule -DisplayName "ComSSUCast Application #$idx (Inbound)" `
+            -Direction Inbound -Action Allow -Program $exePath `
+            -Profile Private,Domain,Public -Enabled True | Out-Null
+        Write-Host "  Allowed executable (all TCP/UDP ports): $exePath"
+        $idx++
+    }
 } else {
     Write-Host "  Note: ComSSUCast.exe not found in default paths (port rules will still be added)." -ForegroundColor Yellow
 }
 
-if ($helperExePath) {
-    New-NetFirewallRule -DisplayName "ComSSUCast Miracast Helper (Inbound)" `
-        -Direction Inbound -Action Allow -Program $helperExePath `
-        -Profile Private,Domain,Public -Enabled True | Out-Null
-    Write-Host "  Allowed executable: $helperExePath"
+if ($helperExePaths.Count -gt 0) {
+    $idx = 1
+    foreach ($exePath in $helperExePaths) {
+        New-NetFirewallRule -DisplayName "ComSSUCast Miracast Helper #$idx (Inbound)" `
+            -Direction Inbound -Action Allow -Program $exePath `
+            -Profile Private,Domain,Public -Enabled True | Out-Null
+        Write-Host "  Allowed executable (all TCP/UDP ports): $exePath"
+        $idx++
+    }
 } else {
     Write-Host "  Note: ComSSUMiracastHelper.exe not found in default paths (port rules will still be added)." -ForegroundColor Yellow
+}
+
+# Allow Windows native Miracast runtime hosts (CastSrv.exe and WUDFHost.exe) across all profiles
+# so dynamic RTSP/RTP media ports over the Wi-Fi Direct Virtual Adapter (Public profile) and LAN are never blocked.
+$systemMiracastHosts = @(
+    @{ Name = "ComSSUCast Windows CastSrv (Inbound)";  Path = "$env:WINDIR\System32\CastSrv.exe" },
+    @{ Name = "ComSSUCast Windows WUDFHost (Inbound)"; Path = "$env:WINDIR\System32\WUDFHost.exe" }
+)
+foreach ($sysHost in $systemMiracastHosts) {
+    if (Test-Path $sysHost.Path) {
+        New-NetFirewallRule -DisplayName $sysHost.Name `
+            -Direction Inbound -Action Allow -Program $sysHost.Path `
+            -Profile Private,Domain,Public -Enabled True | Out-Null
+        Write-Host "  Allowed Windows Miracast runtime host: $($sysHost.Path)"
+    }
 }
 
 # Port rules covering Miracast (MS-MICE/RTSP/RTP), mDNS, Google Cast, AirPlay, DLNA/SSDP, and Web UI

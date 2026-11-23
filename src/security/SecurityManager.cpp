@@ -123,10 +123,14 @@ bool SecurityManager::checkConnection(const QString& deviceName,
                                       const QString& deviceIdentifier) {
     // Fast path 1: approval disabled — allow all local connections
     if (!m_settings.requireApproval()) {
+        qInfo("SecurityManager::checkConnection — approval disabled, auto-allowing '%s' (%s, id=%s)",
+              qPrintable(deviceName), qPrintable(protocol), qPrintable(deviceIdentifier));
         return true;
     }
     // Fast path 2: already trusted — skip prompt
     if (isTrusted(deviceIdentifier)) {
+        qInfo("SecurityManager::checkConnection — trusted device '%s' (%s, id=%s), auto-allowing",
+              qPrintable(deviceName), qPrintable(protocol), qPrintable(deviceIdentifier));
         return true;
     }
 
@@ -137,6 +141,10 @@ bool SecurityManager::checkConnection(const QString& deviceName,
     req->protocol        = protocol;
     req->deviceIdentifier = deviceIdentifier;
 
+    qInfo("SecurityManager::checkConnection — prompting approval for '%s' (%s, id=%s, reqId=%s)",
+          qPrintable(deviceName), qPrintable(protocol),
+          qPrintable(deviceIdentifier), qPrintable(req->requestId));
+
     // Dispatch to Qt event loop (QueuedConnection marshals across thread boundary)
     QMetaObject::invokeMethod(this, [this, req]() {
         m_pendingRequests[req->requestId] = req;
@@ -145,7 +153,17 @@ bool SecurityManager::checkConnection(const QString& deviceName,
 
     // Block calling thread until resolveApproval() releases or timeout fires
     bool acquired = req->semaphore.tryAcquire(1, m_approvalTimeoutMs);
-    return acquired && req->approved;
+    if (!acquired) {
+        qWarning("SecurityManager::checkConnection — approval timed out after %d ms for '%s' (%s)",
+                 m_approvalTimeoutMs, qPrintable(deviceName), qPrintable(protocol));
+        QMetaObject::invokeMethod(this, [this, reqId = req->requestId]() {
+            m_pendingRequests.remove(reqId);
+        }, Qt::QueuedConnection);
+        return false;
+    }
+    qInfo("SecurityManager::checkConnection — resolved '%s' (%s): %s",
+          qPrintable(deviceName), qPrintable(protocol), req->approved ? "APPROVED" : "DENIED");
+    return req->approved;
 }
 
 // Alias so tests can refer to the synchronous variant by an explicit name
@@ -158,7 +176,7 @@ bool SecurityManager::checkConnectionSync(const QString& deviceName,
 // ---------------------------------------------------------------------------
 // checkConnectionAsync() — non-blocking approval for Qt-main-thread callers
 //
-// Used by Cast (runs on Qt main thread; blocking would deadlock the event loop).
+// Used by Cast and Miracast (run on Qt main thread; blocking would deadlock the event loop).
 // Same fast paths as checkConnection(). If a prompt is needed, the callback is
 // stored and invoked when resolveApproval() is called from QML.
 // ---------------------------------------------------------------------------
@@ -168,17 +186,25 @@ void SecurityManager::checkConnectionAsync(const QString& deviceName,
                                            const QString& deviceIdentifier,
                                            std::function<void(bool)> callback) {
     if (!m_settings.requireApproval()) {
+        qInfo("SecurityManager::checkConnectionAsync — approval disabled, auto-allowing '%s' (%s, id=%s)",
+              qPrintable(deviceName), qPrintable(protocol), qPrintable(deviceIdentifier));
         if (callback) callback(true);
         return;
     }
     if (isTrusted(deviceIdentifier)) {
+        qInfo("SecurityManager::checkConnectionAsync — trusted device '%s' (%s, id=%s), auto-allowing",
+              qPrintable(deviceName), qPrintable(protocol), qPrintable(deviceIdentifier));
         if (callback) callback(true);
         return;
     }
 
     // Prompt required — store callback and emit signal
     QString requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    qInfo("SecurityManager::checkConnectionAsync — prompting approval for '%s' (%s, id=%s, reqId=%s)",
+          qPrintable(deviceName), qPrintable(protocol),
+          qPrintable(deviceIdentifier), qPrintable(requestId));
     m_asyncCallbacks[requestId] = std::move(callback);
+    m_asyncDeviceIds[requestId] = deviceIdentifier;
     emit requestApproval(requestId, deviceName, protocol);
 }
 
@@ -199,6 +225,8 @@ void SecurityManager::resolveApproval(const QString& requestId, bool approved) {
         if (approved && !req->deviceIdentifier.isEmpty()) {
             m_settings.addTrustedDevice(req->deviceIdentifier);
         }
+        qInfo("SecurityManager::resolveApproval (sync) — reqId=%s device='%s' approved=%s",
+              qPrintable(requestId), qPrintable(req->deviceName), approved ? "true" : "false");
         req->semaphore.release(1);  // Unblocks the protocol callback thread
         return;
     }
@@ -208,10 +236,12 @@ void SecurityManager::resolveApproval(const QString& requestId, bool approved) {
     if (asyncIt != m_asyncCallbacks.end()) {
         auto cb = asyncIt.value();
         m_asyncCallbacks.erase(asyncIt);
-        if (approved) {
-            // Identifier not stored for async path here — callers pass it upstream
-            // (CastHandler will store the UUID before calling checkConnectionAsync)
+        const QString deviceId = m_asyncDeviceIds.take(requestId);
+        if (approved && !deviceId.isEmpty()) {
+            m_settings.addTrustedDevice(deviceId);
         }
+        qInfo("SecurityManager::resolveApproval (async) — reqId=%s deviceId='%s' approved=%s",
+              qPrintable(requestId), qPrintable(deviceId), approved ? "true" : "false");
         if (cb) cb(approved);
     }
 }

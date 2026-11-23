@@ -172,12 +172,27 @@ bool AirPlayHandler::start() {
     }, nullptr);
     raop_set_log_level(m_raop, 6);  // LOGGER_INFO — captures conn lifecycle messages
 
-    // 2c. Initialize UxPlay's dnssd object — the /info handler reads the name,
-    //     device ID, features and TXT records from raop->dnssd. It advertises
-    //     nothing (AirShow builds src/airplay/airshow_dnssd.c in place of UxPlay's
-    //     Bonjour-based dnssd.c); DiscoveryManager does the mDNS.
+    // 2c. Enable HLS support — without this, UxPlay drops all requests that lack
+    //     a CSeq header (including macOS's initial /info probe), preventing the
+    //     device from appearing in Screen Mirroring UI.
+    raop_set_plist(m_raop, "hls", 1);
+
+    // 3. Generate/load Ed25519 keypair and write PEM keyfile.
+    //    nohold=1 → allow new connection to replace any stale/existing connection (D-09)
+    //    instead of rejecting with HTTP 409 Conflict.
+    int keyfileResult = raop_init2(m_raop, 1, m_deviceId.c_str(), m_keyfilePath.c_str());
+    if (keyfileResult < 0) {
+        g_warning("AirPlayHandler::start — raop_init2() failed (result=%d)", keyfileResult);
+        raop_destroy(m_raop);
+        m_raop = nullptr;
+        return false;
+    }
+
+    // 3a. Initialize UxPlay's dnssd object AFTER raop_init2() so raop->pk_str is
+    //     populated when raop_set_dnssd() passes it to dnssd_set_pk().
+    //     The /info handler reads the name, device ID, features and TXT records
+    //     from raop->dnssd. DiscoveryManager performs the actual mDNS advertising.
     {
-        // dnssd wants the raw 6-byte hardware address; m_deviceId is "AA:BB:CC:DD:EE:FF".
         unsigned int mac[6] = {};
         const int macLen = std::sscanf(m_deviceId.c_str(), "%x:%x:%x:%x:%x:%x",
                                        &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
@@ -199,28 +214,16 @@ bool AirPlayHandler::start() {
         }
     }
 
-    // 2d. Enable HLS support — without this, UxPlay drops all requests that lack
-    //     a CSeq header (including macOS's initial /info probe), preventing the
-    //     device from appearing in Screen Mirroring UI.
-    raop_set_plist(m_raop, "hls", 1);
-
-    // 3. Generate/load Ed25519 keypair and write PEM keyfile.
-    //    nohold=0 → normal (non-hold) mode.
-    //    We do NOT call raop_set_dnssd() — AirShow's DiscoveryManager already advertises
-    //    _airplay._tcp and _raop._tcp (Pitfall 7: prevent duplicate mDNS entries).
-    int keyfileResult = raop_init2(m_raop, 0, m_deviceId.c_str(), m_keyfilePath.c_str());
-    if (keyfileResult < 0) {
-        g_warning("AirPlayHandler::start — raop_init2() failed (result=%d)", keyfileResult);
-        raop_destroy(m_raop);
-        m_raop = nullptr;
-        return false;
-    }
-
-    // 3b. Enable PIN pairing if configured (D-05, D-06, D-07).
-    //     MUST be called after raop_init2 and before raop_start_httpd (Pitfall 2).
-    if (m_securityManager && m_securityManager->isPinEnabled()) {
-        int pinValue = m_securityManager->pin().toInt();
-        raop_set_plist(m_raop, "pin", pinValue);
+    // 3b. Configure fixed AirPlay TCP and UDP ports matching WindowsFirewall rules:
+    //     TCP: mirror_data_lport = 7100, port = 7000
+    //     UDP: timing_lport = 7011, control_lport = 6001, data_lport = 6000
+    //     Without this, UxPlay binds random ephemeral ports that are blocked by
+    //     port-based firewall rules on Windows.
+    {
+        unsigned short tcpPorts[2] = {7100, 7000};
+        unsigned short udpPorts[3] = {7011, 6001, 6000};
+        raop_set_tcp_ports(m_raop, tcpPorts);
+        raop_set_udp_ports(m_raop, udpPorts);
     }
 
     // 4. Read pk from PEM keyfile and update TXT records (Pitfall 1)
@@ -230,6 +233,8 @@ bool AirPlayHandler::start() {
     } else if (pk.size() != 64) {
         g_warning("AirPlayHandler::start — pk has unexpected length %zu (expected 64)", pk.size());
     } else {
+        g_message("AirPlayHandler::start — loaded Ed25519 public key pk=%s for deviceId=%s",
+                  pk.c_str(), m_deviceId.c_str());
         if (m_discoveryManager) {
             m_discoveryManager->updateTxtRecord("_airplay._tcp", "pk", pk);
             m_discoveryManager->updateTxtRecord("_raop._tcp",    "pk", pk);
@@ -248,6 +253,8 @@ bool AirPlayHandler::start() {
     if (port != 7000) {
         g_warning("AirPlayHandler::start — RAOP server bound to port %u instead of 7000 — iOS may not connect",
                   static_cast<unsigned>(port));
+    } else {
+        g_message("AirPlayHandler::start — AirPlay RAOP/mirror server listening on TCP 7000/7100, UDP 6000/6001/7011");
     }
 
     m_running = true;
@@ -361,9 +368,14 @@ void AirPlayHandler::onAudioGetFormat(unsigned char* ct, unsigned short* /*spf*/
     m_audioCapsSet = true;
 }
 
-void AirPlayHandler::onReportClientRequest(char* deviceid, char* /*model*/,
+void AirPlayHandler::onReportClientRequest(char* deviceid, char* model,
                                            char* devicename, bool* admit) {
     m_currentDeviceName = (devicename && *devicename) ? std::string(devicename) : "Unknown";
+    const char* modelStr = (model && *model) ? model : "UnknownModel";
+    const char* idStr    = (deviceid && *deviceid) ? deviceid : "";
+
+    g_message("AirPlayHandler::onReportClientRequest — incoming AirPlay connection from name='%s' model='%s' deviceId='%s'",
+              m_currentDeviceName.c_str(), modelStr, idStr);
 
     // Phase 7 (SEC-01): Check with SecurityManager before admitting connection.
     // Runs on UxPlay's RAOP thread — use synchronous checkConnection (QSemaphore blocking),
@@ -373,9 +385,13 @@ void AirPlayHandler::onReportClientRequest(char* deviceid, char* /*model*/,
             QString name = QString::fromStdString(m_currentDeviceName);
             QString id   = (deviceid && *deviceid) ? QString::fromUtf8(deviceid) : name;
             *admit = m_securityManager->checkConnection(name, QStringLiteral("AirPlay"), id);
+            g_message("AirPlayHandler::onReportClientRequest — SecurityManager decision for '%s' (%s): %s",
+                      m_currentDeviceName.c_str(), idStr, *admit ? "APPROVED" : "DENIED");
         } else {
             // Backward compatible: no SecurityManager → admit all (D-08)
             *admit = true;
+            g_message("AirPlayHandler::onReportClientRequest — no SecurityManager, auto-admitting '%s'",
+                      m_currentDeviceName.c_str());
         }
     }
 }

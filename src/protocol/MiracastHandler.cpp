@@ -361,41 +361,40 @@ void MiracastHandler::onRtspData() {
             break;
 
         case State::NegotiatingM4:
-            // M4: SET_PARAMETER from source with selected codec + RTP ports
-            if (msg.isRequest && msg.method == QStringLiteral("SET_PARAMETER")) {
-                qDebug("Miracast: M4 SET_PARAMETER received — selected params:\n%s",
-                       msg.body.constData());
-                const QString m4Resp = buildRtspResponse(msg.cseq, 200);
-                m_rtspSocket->write(m4Resp.toUtf8());
-                m_state = State::NegotiatingM5;
-                qDebug("Miracast: sent M4 200 OK");
-            }
-            break;
-
         case State::NegotiatingM5:
-            // M5: SET_PARAMETER with wfd_trigger_method: SETUP
+            // M4 / M5: SET_PARAMETER from source (selected codec/RTP ports, then wfd_trigger_method: SETUP)
             if (msg.isRequest && msg.method == QStringLiteral("SET_PARAMETER")) {
-                const QString m5Resp = buildRtspResponse(msg.cseq, 200);
-                m_rtspSocket->write(m5Resp.toUtf8());
-                qDebug("Miracast: sent M5 200 OK — sending M6 SETUP");
+                qDebug("Miracast: SET_PARAMETER received in state %d:\n%s",
+                       static_cast<int>(m_state), msg.body.constData());
+                const QString resp = buildRtspResponse(msg.cseq, 200);
+                m_rtspSocket->write(resp.toUtf8());
 
-                // Send M6 SETUP
-                const QString rtspUri = QStringLiteral("rtsp://%1:%2/wfd1.0/streamid=0")
-                    .arg(m_sourceAddr.toString())
-                    .arg(m_rtspPort);
-                const QString transportHeader =
-                    QStringLiteral("Transport: RTP/AVP/UDP;unicast;client_port=%1\r\n")
-                    .arg(m_udpPort);
-                sendRtspRequest(QStringLiteral("SETUP"), rtspUri, transportHeader);
-                m_state = State::SendingSetup;
-                qDebug("Miracast: sent M6 SETUP (client_port=%d)", m_udpPort);
+                if (msg.body.contains("wfd_trigger_method: SETUP")) {
+                    qDebug("Miracast: wfd_trigger_method: SETUP acknowledged — sending M6 SETUP");
+                    const QString rtspUri = QStringLiteral("rtsp://%1:%2/wfd1.0/streamid=0")
+                        .arg(m_sourceAddr.toString())
+                        .arg(m_rtspPort);
+                    const QString transportHeader =
+                        QStringLiteral("Transport: RTP/AVP/UDP;unicast;client_port=%1\r\n")
+                        .arg(m_udpPort);
+                    sendRtspRequest(QStringLiteral("SETUP"), rtspUri, transportHeader);
+                    m_state = State::SendingSetup;
+                    qDebug("Miracast: sent M6 SETUP (client_port=%d)", m_udpPort);
+                } else {
+                    m_state = State::NegotiatingM5;
+                }
             }
             break;
 
         case State::SendingSetup:
-            // M6 response: 200 OK with Transport header containing server_port
+            // M6 response: 200 OK with Session and Transport headers
             if (!msg.isRequest && msg.statusCode == 200) {
-                qDebug("Miracast: M6 SETUP accepted — sending M7 PLAY");
+                if (!msg.session.isEmpty()) {
+                    const int semi = msg.session.indexOf(QLatin1Char(';'));
+                    m_rtspSessionId = (semi > 0 ? msg.session.left(semi) : msg.session).trimmed();
+                }
+                qDebug("Miracast: M6 SETUP accepted (Session='%s') — sending M7 PLAY",
+                       qPrintable(m_rtspSessionId));
 
                 // Initialize the GStreamer MPEG-TS/RTP receive pipeline
                 if (m_pipeline) {
@@ -404,11 +403,14 @@ void MiracastHandler::onRtspData() {
                     }
                 }
 
-                // Send M7 PLAY
+                // Send M7 PLAY (including Session header required by RFC 2326 / WFD spec)
                 const QString rtspUri = QStringLiteral("rtsp://%1:%2/wfd1.0/streamid=0")
                     .arg(m_sourceAddr.toString())
                     .arg(m_rtspPort);
-                sendRtspRequest(QStringLiteral("PLAY"), rtspUri);
+                const QString sessionHeader = m_rtspSessionId.isEmpty()
+                    ? QString{}
+                    : QStringLiteral("Session: %1\r\n").arg(m_rtspSessionId);
+                sendRtspRequest(QStringLiteral("PLAY"), rtspUri, sessionHeader);
                 m_state = State::SendingPlay;
                 qDebug("Miracast: sent M7 PLAY");
             }
@@ -508,6 +510,7 @@ void MiracastHandler::teardown() {
     m_rtspBuffer.clear();
     m_sourceName.clear();
     m_sourceId.clear();
+    m_rtspSessionId.clear();
     m_cseq = 1;
 
     // Return to waiting for next connection (server still listening)
@@ -631,6 +634,8 @@ bool MiracastHandler::parseNextRtspMessage(RtspMessage& msg) {
             msg.contentLength = value.toInt();
         } else if (key == QStringLiteral("content-type")) {
             msg.contentType = value;
+        } else if (key == QStringLiteral("session")) {
+            msg.session = value;
         }
     }
 

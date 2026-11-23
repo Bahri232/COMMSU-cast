@@ -85,8 +85,19 @@ void MediaPipeline::play() {
         GstStateChangeReturn ret = gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
         if (ret == GST_STATE_CHANGE_FAILURE) {
             g_warning("MediaPipeline::play — GST_STATE_CHANGE_FAILURE on m_pipeline");
+        } else {
+            g_message("MediaPipeline::play — m_pipeline transitioned to PLAYING (ret=%d)", static_cast<int>(ret));
         }
         m_needsPlay = false;
+    }
+    // Miracast RTP/MPEG-TS pipeline
+    if (m_miracastPipeline) {
+        GstStateChangeReturn ret = gst_element_set_state(m_miracastPipeline, GST_STATE_PLAYING);
+        if (ret == GST_STATE_CHANGE_FAILURE) {
+            g_warning("MediaPipeline::play — GST_STATE_CHANGE_FAILURE on m_miracastPipeline");
+        } else {
+            g_message("MediaPipeline::play — m_miracastPipeline transitioned to PLAYING (ret=%d)", static_cast<int>(ret));
+        }
     }
 }
 
@@ -543,6 +554,8 @@ bool MediaPipeline::initAppsrcPipeline(void* qmlVideoItem) {
         return false;
     }
 
+    g_message("MediaPipeline::initAppsrcPipeline — AirPlay appsrc GStreamer pipeline initialized and set to PLAYING (ret=%d)",
+              static_cast<int>(ret));
     return true;
 }
 

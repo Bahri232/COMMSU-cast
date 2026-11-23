@@ -34,8 +34,9 @@ HRESULT addPortRule(INetFwRules* pRules, const wchar_t* name,
     pRule->put_Direction(NET_FW_RULE_DIR_IN);
     pRule->put_Action(NET_FW_ACTION_ALLOW);
     pRule->put_Enabled(VARIANT_TRUE);
-    pRule->put_Profiles(NET_FW_PROFILE2_DOMAIN | NET_FW_PROFILE2_PRIVATE);
+    pRule->put_Profiles(NET_FW_PROFILE2_DOMAIN | NET_FW_PROFILE2_PRIVATE | NET_FW_PROFILE2_PUBLIC);
 
+    pRules->Remove(bName);
     hr = pRules->Add(pRule);
 
     SysFreeString(bPorts);
@@ -67,8 +68,9 @@ HRESULT addAppRule(INetFwRules* pRules, const wchar_t* name, const wchar_t* appP
     pRule->put_Direction(NET_FW_RULE_DIR_IN);
     pRule->put_Action(NET_FW_ACTION_ALLOW);
     pRule->put_Enabled(VARIANT_TRUE);
-    pRule->put_Profiles(NET_FW_PROFILE2_DOMAIN | NET_FW_PROFILE2_PRIVATE);
+    pRule->put_Profiles(NET_FW_PROFILE2_DOMAIN | NET_FW_PROFILE2_PRIVATE | NET_FW_PROFILE2_PUBLIC);
 
+    pRules->Remove(bName);
     hr = pRules->Add(pRule);
 
     SysFreeString(bApp);
@@ -103,20 +105,55 @@ bool WindowsFirewall::registerRules() {
     }
 
     INetFwRules* pRules = nullptr;
-    pPolicy->get_Rules(&pRules);
+    hr = pPolicy->get_Rules(&pRules);
+    if (FAILED(hr) || !pRules) {
+        pPolicy->Release();
+        CoUninitialize();
+        return false;
+    }
 
-    // Register inbound application allow rules for ComSSUCast.exe and ComSSUMiracastHelper.exe
+    HRESULT firstAddHr = S_OK;
+
+    // Register inbound application allow rules (all TCP/UDP dynamic & static ports)
+    // across Domain, Private, and Public (Wi-Fi Direct virtual adapter uses Public).
     wchar_t exeBuf[MAX_PATH]{};
     const DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
     if (len > 0 && len < MAX_PATH) {
         const std::filesystem::path exePath(exeBuf);
         const std::filesystem::path helperPath = exePath.parent_path() / L"ComSSUMiracastHelper.exe";
-        addAppRule(pRules, L"ComSSUCast Application", exePath.wstring().c_str());
+        firstAddHr = addAppRule(pRules, L"ComSSUCast Application", exePath.wstring().c_str());
         addAppRule(pRules, L"ComSSUMiracastHelper Application", helperPath.wstring().c_str());
+
+        std::error_code ec;
+        const std::filesystem::path devHelperPath =
+            exePath.parent_path() / L"tools" / L"miracast-helper" / L"ComSSUMiracastHelper.exe";
+        if (std::filesystem::exists(devHelperPath, ec)) {
+            addAppRule(pRules, L"ComSSUMiracastHelper Dev Application", devHelperPath.wstring().c_str());
+        }
+    }
+
+    // Register inbound application allow rules for Windows' native Miracast runtime hosts
+    // (CastSrv.exe and WUDFHost.exe) so dynamic RTSP/RTP video streams over Wi-Fi Direct are allowed.
+    wchar_t sysDirBuf[MAX_PATH]{};
+    const UINT sysLen = GetSystemDirectoryW(sysDirBuf, MAX_PATH);
+    if (sysLen > 0 && sysLen < MAX_PATH) {
+        const std::filesystem::path sysDir(sysDirBuf);
+        const std::filesystem::path castSrvPath = sysDir / L"CastSrv.exe";
+        const std::filesystem::path wudfHostPath = sysDir / L"WUDFHost.exe";
+        std::error_code ec;
+        if (std::filesystem::exists(castSrvPath, ec)) {
+            addAppRule(pRules, L"ComSSUCast Windows CastSrv", castSrvPath.wstring().c_str());
+        }
+        if (std::filesystem::exists(wudfHostPath, ec)) {
+            addAppRule(pRules, L"ComSSUCast Windows WUDFHost", wudfHostPath.wstring().c_str());
+        }
     }
 
     // Register inbound port rules for mDNS, SSDP, AirPlay/RTP, Cast, Miracast, and Web UI
-    addPortRule(pRules, L"ComSSUCast mDNS",          NET_FW_IP_PROTOCOL_UDP, L"5353");
+    HRESULT portHr = addPortRule(pRules, L"ComSSUCast mDNS",          NET_FW_IP_PROTOCOL_UDP, L"5353");
+    if (SUCCEEDED(firstAddHr) && FAILED(portHr)) {
+        firstAddHr = portHr;
+    }
     addPortRule(pRules, L"ComSSUCast SSDP",          NET_FW_IP_PROTOCOL_UDP, L"1900");
     addPortRule(pRules, L"ComSSUCast AirPlay TCP",   NET_FW_IP_PROTOCOL_TCP, L"7000-7001,7100");
     addPortRule(pRules, L"ComSSUCast AirPlay RTP",   NET_FW_IP_PROTOCOL_UDP, L"6000-6001,7010-7011");
@@ -127,9 +164,16 @@ bool WindowsFirewall::registerRules() {
     addPortRule(pRules, L"ComSSUCast Protocol",      NET_FW_IP_PROTOCOL_TCP, L"7400");
     addPortRule(pRules, L"ComSSUCast Web",           NET_FW_IP_PROTOCOL_TCP, L"7401");
 
-    if (pRules)  pRules->Release();
-    if (pPolicy) pPolicy->Release();
+    pRules->Release();
+    pPolicy->Release();
     CoUninitialize();
+
+    if (FAILED(firstAddHr)) {
+        g_info("WindowsFirewall: rule registration returned hr=0x%lx (run as Administrator or run scripts/setup-windows-miracast.ps1)",
+               static_cast<unsigned long>(firstAddHr));
+        return false;
+    }
+    g_message("WindowsFirewall: registered program and port rules across Domain, Private, and Public profiles");
     return true;
 #else
     // D-14: Linux and macOS rely on system defaults — no firewall changes needed

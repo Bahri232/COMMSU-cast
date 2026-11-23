@@ -124,6 +124,7 @@ private:
     // cross-thread synchronization primitive.
     QHash<QString, std::shared_ptr<ApprovalRequest>>  m_pendingRequests;
     QHash<QString, std::function<void(bool)>>          m_asyncCallbacks;
+    QHash<QString, QString>                            m_asyncDeviceIds;
 };
 
 } // namespace airshow

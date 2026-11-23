@@ -124,6 +124,7 @@ private:
         int     statusCode{0};// 0 for requests
         int     cseq{0};
         QString contentType;
+        QString session;      // RTSP Session header (from M6 SETUP response)
         int     contentLength{0};
         QByteArray body;
         bool    isRequest{false};
@@ -148,6 +149,7 @@ private:
     QString           m_sourceName;                 // Friendly name from SOURCE_READY
     QHostAddress      m_sourceAddr;                 // IP of the Windows source
     QString           m_sourceId;                   // SourceID TLV from SOURCE_READY
+    QString           m_rtspSessionId;              // RTSP Session ID from M6 200 OK
     int               m_udpPort        = kDefaultRtpPort; // negotiated RTP receive port
     void*             m_qmlVideoItem   = nullptr;   // stored for initMiracastPipeline()
 

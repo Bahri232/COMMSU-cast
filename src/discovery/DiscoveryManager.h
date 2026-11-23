@@ -49,6 +49,7 @@ public:
 private:
     AppSettings*                     m_settings;
     std::unique_ptr<ServiceAdvertiser> m_advertiser;
+    std::string                      m_deviceId;
     bool                             m_running = false;
 
     // Read device MAC address of first non-loopback NIC for AirPlay deviceid TXT field.

@@ -1,9 +1,11 @@
 #include <QGuiApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QQmlContext>
 #include <QStandardPaths>
 #include <QNetworkInterface>
 #include <gst/gst.h>
+#include <glib.h>
 #include "pipeline/MediaPipeline.h"
 #include "ui/ReceiverWindow.h"
 #include "ui/ConnectionBridge.h"
@@ -23,8 +25,10 @@
 #include "protocol/ProtocolManager.h"
 #include "web/WebInterface.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <mutex>
 #include <string>
 
 #ifdef _WIN32
@@ -144,18 +148,95 @@ static void checkRequiredPlugins() {
     }
 }
 
+static std::mutex g_logFileMutex;
+static FILE* g_logFile = nullptr;
+
+static void initLogFile() {
+    std::lock_guard<std::mutex> lock(g_logFileMutex);
+    if (g_logFile) return;
+
+    std::filesystem::path logDir;
 #ifdef _WIN32
-static void customMessageHandler(QtMsgType type, const QMessageLogContext& /*context*/, const QString& msg) {
-    QByteArray localMsg = msg.toLocal8Bit();
-    fprintf(stderr, "%s\n", localMsg.constData());
-    fflush(stderr);
+    wchar_t localAppData[MAX_PATH]{};
+    DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    if (n > 0 && n < MAX_PATH) {
+        logDir = std::filesystem::path(localAppData) / L"ComSSUCast" / L"logs";
+    }
+#endif
+    if (logDir.empty()) {
+        const std::filesystem::path exeDir = executableDir();
+        if (!exeDir.empty()) {
+            logDir = exeDir / "logs";
+        }
+    }
+    if (logDir.empty()) return;
+
+    std::error_code ec;
+    std::filesystem::create_directories(logDir, ec);
+    const std::filesystem::path logPath = logDir / "comssucast.log";
+#ifdef _WIN32
+    g_logFile = _wfopen(logPath.wstring().c_str(), L"a");
+#else
+    g_logFile = std::fopen(logPath.string().c_str(), "a");
+#endif
+    if (g_logFile) {
+        const QByteArray ts = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")).toUtf8();
+        std::fprintf(g_logFile, "\n[%s] [INFO] === ComSSUCast session started ===\n", ts.constData());
+        std::fflush(g_logFile);
+    }
+}
+
+static void writeLogLine(const char* level, const QString& msg) {
+    const QByteArray ts = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")).toUtf8();
+    const QByteArray utf8Msg = msg.toUtf8();
+    {
+        std::lock_guard<std::mutex> lock(g_logFileMutex);
+        if (g_logFile) {
+            std::fprintf(g_logFile, "[%s] [%s] %s\n", ts.constData(), level, utf8Msg.constData());
+            std::fflush(g_logFile);
+        }
+    }
+    std::fprintf(stderr, "[%s] [%s] %s\n", ts.constData(), level, utf8Msg.constData());
+    std::fflush(stderr);
+#ifdef _WIN32
     OutputDebugStringW(reinterpret_cast<const wchar_t*>(msg.utf16()));
     OutputDebugStringW(L"\n");
+#endif
+}
+
+static void customMessageHandler(QtMsgType type, const QMessageLogContext& /*context*/, const QString& msg) {
+    const char* level = "INFO";
+    switch (type) {
+        case QtDebugMsg:    level = "DEBUG"; break;
+        case QtInfoMsg:     level = "INFO"; break;
+        case QtWarningMsg:  level = "WARN"; break;
+        case QtCriticalMsg: level = "ERROR"; break;
+        case QtFatalMsg:    level = "FATAL"; break;
+    }
+    writeLogLine(level, msg);
     if (type == QtFatalMsg) {
         abort();
     }
 }
-#endif
+
+static void customGlibLogHandler(const gchar* logDomain,
+                                 GLogLevelFlags logLevel,
+                                 const gchar* message,
+                                 gpointer /*userData*/) {
+    if (!message) return;
+    const char* level = "INFO";
+    if (logLevel & (G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL)) {
+        level = "ERROR";
+    } else if (logLevel & G_LOG_LEVEL_WARNING) {
+        level = "WARN";
+    } else if (logLevel & G_LOG_LEVEL_DEBUG) {
+        level = "DEBUG";
+    }
+    QString formatted = logDomain && logDomain[0] != '\0'
+        ? QStringLiteral("[%1] %2").arg(QString::fromUtf8(logDomain), QString::fromUtf8(message))
+        : QString::fromUtf8(message);
+    writeLogLine(level, formatted);
+}
 
 int main(int argc, char* argv[]) {
 #ifdef _WIN32
@@ -183,8 +264,10 @@ int main(int argc, char* argv[]) {
             }
         }
     }
-    qInstallMessageHandler(customMessageHandler);
 #endif
+    initLogFile();
+    qInstallMessageHandler(customMessageHandler);
+    g_log_set_default_handler(customGlibLogHandler, nullptr);
 
     useBundledGStreamer();
     gst_init(&argc, &argv);
@@ -205,17 +288,19 @@ int main(int argc, char* argv[]) {
     // Constructed after AppSettings (dependency injection) and before any handler.
     airshow::SecurityManager securityManager(settings);
 
-    // Windows firewall rules — first launch only (D-12/D-13/D-14)
-    if (settings.isFirstLaunch()) {
-        if (!airshow::WindowsFirewall::registerRules()) {
-            // D-13: permission denied — show actionable message
-            qCritical("Firewall rules could not be registered automatically. "
-                      "Please open the following ports manually:\n"
-                      "  UDP 5353 (mDNS), UDP 1900 (SSDP),\n"
-                      "  TCP 7000 (AirPlay), TCP 8009 (Google Cast),\n"
-                      "  TCP 7250 / 7236 / UDP 1028 (Miracast),\n"
-                      "  TCP 7400 (AirShow), TCP 7401 (Web Interface)");
+    // Register Windows firewall rules across Domain/Private/Public profiles (D-12/D-13/D-14)
+    if (airshow::WindowsFirewall::registerRules()) {
+        if (settings.isFirstLaunch()) {
+            settings.setFirstLaunchComplete();
         }
+    } else if (settings.isFirstLaunch()) {
+        // D-13: permission denied — show actionable message
+        qCritical("Firewall rules could not be registered automatically. "
+                  "Run scripts/setup-windows-miracast.ps1 as Administrator or open:\n"
+                  "  UDP 5353 (mDNS), UDP 1900 (SSDP),\n"
+                  "  TCP 7000-7001, 7100 / UDP 6000-6001, 7010-7011 (AirPlay),\n"
+                  "  TCP 8009 (Google Cast), TCP 7250 / 7236 / UDP 1028 (Miracast),\n"
+                  "  TCP 7400 (AirShow), TCP 7401 (Web Interface)");
         settings.setFirstLaunchComplete();
     }
 

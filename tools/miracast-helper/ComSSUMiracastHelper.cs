@@ -26,6 +26,7 @@ namespace ComSSUCast.MiracastHelper
         public string RequestId;
         public string DeviceName;
         public string MacAddress;
+        public MiracastReceiverConnectionCreatedEventArgs EventArgs;
         public MiracastReceiverConnection Connection;
         public Deferral Deferral;
         public System.Threading.Timer TimeoutTimer;
@@ -46,6 +47,22 @@ namespace ComSSUCast.MiracastHelper
             [In] DispatcherQueueOptions options,
             [Out] out IntPtr dispatcherQueueController);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(
+            IntPtr hWnd,
+            IntPtr hWndInsertAfter,
+            int X,
+            int Y,
+            int cx,
+            int cy,
+            uint uFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_SHOWWINDOW = 0x0040;
+
         [ComImport]
         [Guid("29E691FA-4567-4DCA-B319-D0F207EB6807")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -64,22 +81,30 @@ namespace ComSSUCast.MiracastHelper
         private CompositionSurfaceBrush _surfaceBrush;
         private MediaPlayer _mediaPlayer;
         private MediaPlayerSurface _mediaSurface;
+        private MediaSource _activeMediaSource;
+        private MediaPlaybackItem _activePlaybackItem;
         private Action _onUserDisconnectRequested;
 
         public MiracastVideoForm(Action onUserDisconnectRequested)
         {
             _onUserDisconnectRequested = onUserDisconnectRequested;
 
+            Rectangle bounds = Screen.PrimaryScreen != null
+                ? Screen.PrimaryScreen.Bounds
+                : new Rectangle(0, 0, 1920, 1080);
+
             Text = "CS Society Display — Miracast Session";
             FormBorderStyle = FormBorderStyle.None;
-            WindowState = FormWindowState.Maximized;
+            StartPosition = FormStartPosition.Manual;
+            Bounds = bounds;
             BackColor = Color.Black;
             ShowInTaskbar = false;
             TopMost = true;
             KeyPreview = true;
-
-            // Keep hidden until MediaSourceCreated fires
-            Opacity = 0.0;
+            // IMPORTANT: Do NOT set Opacity = 0.0 here!
+            // Setting Opacity != 1.0 in WinForms adds WS_EX_LAYERED (SetLayeredWindowAttributes)
+            // to the HWND, which prevents DirectComposition CreateDesktopWindowTarget from
+            // presenting video swapchain frames. The form stays hidden until Show() is called.
         }
 
         public void InitializeComposition()
@@ -90,7 +115,8 @@ namespace ComSSUCast.MiracastHelper
                 threadType = 2,    // DQTYPE_THREAD_CURRENT
                 apartmentType = 2  // DQTAT_COM_STA
             };
-            CreateDispatcherQueueController(opts, out _dispatcherQueueController);
+            int hr = CreateDispatcherQueueController(opts, out _dispatcherQueueController);
+            Program.LogDiag("CreateDispatcherQueueController hr=0x" + hr.ToString("X8"));
 
             // Force HWND creation without showing the window
             IntPtr hwnd = Handle;
@@ -110,6 +136,13 @@ namespace ComSSUCast.MiracastHelper
             _mediaPlayer = new MediaPlayer();
             _mediaPlayer.RealTimePlayback = true;
             _mediaPlayer.AutoPlay = true;
+            _mediaPlayer.MediaOpened += OnMediaPlayerOpened;
+            _mediaPlayer.MediaFailed += OnMediaPlayerFailed;
+            _mediaPlayer.MediaEnded += OnMediaPlayerEnded;
+            if (_mediaPlayer.PlaybackSession != null)
+            {
+                _mediaPlayer.PlaybackSession.PlaybackStateChanged += OnPlaybackSessionStateChanged;
+            }
 
             Rectangle bounds = Screen.PrimaryScreen != null
                 ? Screen.PrimaryScreen.Bounds
@@ -119,13 +152,67 @@ namespace ComSSUCast.MiracastHelper
             _mediaSurface = _mediaPlayer.GetSurface(_compositor);
             _surfaceBrush.Surface = _mediaSurface.CompositionSurface;
             _rootVisual.Size = new Vector2(bounds.Width, bounds.Height);
+
+            Program.LogDiag("InitializeComposition completed (hwnd=0x" + hwnd.ToInt64().ToString("X") +
+                            ", size=" + bounds.Width + "x" + bounds.Height + ")");
         }
 
-        public void StartPlayback(MediaSource mediaSource, string deviceName)
+        private void OnMediaPlayerOpened(MediaPlayer sender, object args)
+        {
+            Program.LogDiag("MediaPlayer.MediaOpened fired — starting playback");
+            try
+            {
+                sender.Play();
+            }
+            catch (Exception ex)
+            {
+                Program.LogDiag("MediaPlayer.Play() in MediaOpened failed: " + ex.Message);
+            }
+            Program.EmitJson(new Dictionary<string, object>
+            {
+                { "event", "media_opened" }
+            });
+        }
+
+        private void OnMediaPlayerFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
+        {
+            string errMsg = args != null
+                ? (args.Error.ToString() + ": " + (args.ErrorMessage ?? "") +
+                   (args.ExtendedErrorCode != null ? " (" + args.ExtendedErrorCode.Message + ")" : ""))
+                : "unknown";
+            Program.LogDiag("MediaPlayer.MediaFailed: " + errMsg);
+            Program.EmitJson(new Dictionary<string, object>
+            {
+                { "event", "error" },
+                { "stage", "media_player_failed" },
+                { "message", errMsg }
+            });
+        }
+
+        private void OnMediaPlayerEnded(MediaPlayer sender, object args)
+        {
+            Program.LogDiag("MediaPlayer.MediaEnded fired");
+        }
+
+        private void OnPlaybackSessionStateChanged(MediaPlaybackSession sender, object args)
+        {
+            try
+            {
+                var st = sender != null
+                    ? sender.PlaybackState.ToString()
+                    : "unknown";
+                Program.LogDiag("MediaPlayer state changed -> " + st);
+            }
+            catch
+            {
+            }
+        }
+
+        public void StartPlaybackOnUiThread(MediaSource mediaSource, string deviceName)
         {
             if (InvokeRequired)
             {
-                BeginInvoke(new Action(() => StartPlayback(mediaSource, deviceName)));
+                Invoke(new Action(() => StartPlaybackOnUiThread(mediaSource, deviceName)));
                 return;
             }
 
@@ -133,30 +220,46 @@ namespace ComSSUCast.MiracastHelper
                 ? Screen.PrimaryScreen.Bounds
                 : new Rectangle(0, 0, 1920, 1080);
 
-            Bounds = bounds;
-            WindowState = FormWindowState.Maximized;
             Text = string.IsNullOrEmpty(deviceName)
                 ? "CS Society Display — Miracast"
                 : "CS Society Display — " + deviceName;
 
-            if (_mediaPlayer != null)
+            Bounds = bounds;
+            if (!Visible)
+            {
+                Show();
+            }
+            WindowState = FormWindowState.Maximized;
+            SetWindowPos(Handle, HWND_TOPMOST, bounds.X, bounds.Y, bounds.Width, bounds.Height, SWP_SHOWWINDOW);
+            BringToFront();
+            Activate();
+            SetForegroundWindow(Handle);
+
+            if (_mediaPlayer != null && mediaSource != null)
             {
                 _mediaPlayer.SetSurfaceSize(new Windows.Foundation.Size(bounds.Width, bounds.Height));
                 if (_rootVisual != null)
                 {
                     _rootVisual.Size = new Vector2(bounds.Width, bounds.Height);
                 }
-                _mediaPlayer.Source = mediaSource;
-                _mediaPlayer.Play();
-            }
 
-            Opacity = 1.0;
-            if (!Visible)
-            {
-                Show();
+                // Root both MediaSource and MediaPlaybackItem so the GC cannot finalize them during playback
+                _activeMediaSource = mediaSource;
+                try
+                {
+                    _activePlaybackItem = new MediaPlaybackItem(mediaSource);
+                    _mediaPlayer.Source = _activePlaybackItem;
+                }
+                catch (Exception ex)
+                {
+                    Program.LogDiag("MediaPlaybackItem wrapper fallback to direct MediaSource: " + ex.Message);
+                    _activePlaybackItem = null;
+                    _mediaPlayer.Source = mediaSource;
+                }
+
+                _mediaPlayer.Play();
+                Program.LogDiag("StartPlaybackOnUiThread: MediaSource bound and MediaPlayer.Play() invoked for '" + deviceName + "'");
             }
-            BringToFront();
-            Activate();
         }
 
         public void StopPlayback()
@@ -180,11 +283,14 @@ namespace ComSSUCast.MiracastHelper
                 }
             }
 
-            Opacity = 0.0;
+            _activePlaybackItem = null;
+            _activeMediaSource = null;
+
             if (Visible)
             {
                 Hide();
             }
+            Program.LogDiag("StopPlayback completed");
         }
 
         protected override void OnResize(EventArgs e)
@@ -222,6 +328,8 @@ namespace ComSSUCast.MiracastHelper
         {
             if (disposing)
             {
+                _activePlaybackItem = null;
+                _activeMediaSource = null;
                 try { if (_mediaSurface != null) _mediaSurface.Dispose(); } catch { }
                 try { if (_mediaPlayer != null) _mediaPlayer.Dispose(); } catch { }
                 try { if (_rootVisual != null) _rootVisual.Dispose(); } catch { }
@@ -236,13 +344,16 @@ namespace ComSSUCast.MiracastHelper
     internal static class Program
     {
         private static readonly object StdoutLock = new object();
+        private static readonly object LogFileLock = new object();
         private static readonly ConcurrentDictionary<string, PendingApproval> PendingApprovals =
             new ConcurrentDictionary<string, PendingApproval>();
 
         private static MiracastReceiver _receiver;
         private static MiracastReceiverSession _session;
         private static MiracastReceiverConnection _activeConnection;
+        private static MiracastReceiverMediaSourceCreatedEventArgs _activeMediaSourceArgs;
         private static MiracastVideoForm _videoForm;
+        private static string _logFilePath;
 
         private static string _friendlyName = "CS Society Display";
         private static string _modelName = "ComSSU Cast";
@@ -255,7 +366,11 @@ namespace ComSSUCast.MiracastHelper
         private static int Main(string[] args)
         {
             Console.OutputEncoding = new UTF8Encoding(false);
+            InitLogFile();
             ParseArgs(args);
+
+            LogDiag("ComSSUMiracastHelper starting (friendlyName='" + _friendlyName +
+                    "', authMethod=" + _authMethod + ", checkOnly=" + _checkOnly + ")");
 
             try
             {
@@ -263,6 +378,7 @@ namespace ComSSUCast.MiracastHelper
             }
             catch (Exception ex)
             {
+                LogDiag("Fatal exception in RunMiracastReceiver: " + ex);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "status" },
@@ -271,6 +387,37 @@ namespace ComSSUCast.MiracastHelper
                     { "reason", ex.GetType().Name + ": " + ex.Message }
                 });
                 return 0;
+            }
+        }
+
+        private static void InitLogFile()
+        {
+            try
+            {
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string logDir = Path.Combine(localAppData, "ComSSUCast", "logs");
+                Directory.CreateDirectory(logDir);
+                _logFilePath = Path.Combine(logDir, "miracast-helper.log");
+            }
+            catch
+            {
+                _logFilePath = null;
+            }
+        }
+
+        internal static void LogDiag(string message)
+        {
+            if (string.IsNullOrEmpty(_logFilePath)) return;
+            try
+            {
+                string line = "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "] [MiracastHelper] " + message + Environment.NewLine;
+                lock (LogFileLock)
+                {
+                    File.AppendAllText(_logFilePath, line, Encoding.UTF8);
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -322,6 +469,9 @@ namespace ComSSUCast.MiracastHelper
         {
             _receiver = new MiracastReceiver();
             MiracastReceiverStatus status = _receiver.GetStatus();
+            LogDiag("Initial MiracastReceiverStatus: WiFiStatus=" + status.WiFiStatus +
+                    ", ListeningStatus=" + status.ListeningStatus +
+                    ", MaxSimultaneousConnections=" + status.MaxSimultaneousConnections);
 
             if (_checkOnly)
             {
@@ -341,6 +491,8 @@ namespace ComSSUCast.MiracastHelper
 
             if (status.WiFiStatus == MiracastReceiverWiFiStatus.MiracastNotSupported)
             {
+                string reason = "Wi-Fi adapter does not support Miracast receiver mode (or App.WirelessDisplay.Connect capability is missing).";
+                LogDiag("Miracast unavailable: " + reason);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "status" },
@@ -348,7 +500,7 @@ namespace ComSSUCast.MiracastHelper
                     { "available", false },
                     { "wifiStatus", status.WiFiStatus.ToString() },
                     { "listeningStatus", status.ListeningStatus.ToString() },
-                    { "reason", "Wi-Fi adapter does not support Miracast receiver mode (or App.WirelessDisplay.Connect capability is missing)." }
+                    { "reason", reason }
                 });
                 return 0;
             }
@@ -359,9 +511,14 @@ namespace ComSSUCast.MiracastHelper
             settings.ModelName = _modelName;
             settings.ModelNumber = _modelNumber;
             settings.AuthorizationMethod = _authMethod;
-            settings.RequireAuthorizationFromKnownTransmitters = true;
+            // Allow known transmitters at the WPS layer so Wi-Fi Direct group re-keying does not stall;
+            // ConnectionCreated still fires on every session for ComSSUCast's SecurityManager approval.
+            settings.RequireAuthorizationFromKnownTransmitters = false;
 
             MiracastReceiverApplySettingsResult applyResult = _receiver.DisconnectAllAndApplySettings(settings);
+            LogDiag("DisconnectAllAndApplySettings result: " + applyResult.Status +
+                    (applyResult.ExtendedError != null ? " (" + applyResult.ExtendedError.Message + ")" : ""));
+
             if (applyResult.Status != MiracastReceiverApplySettingsStatus.Success)
             {
                 string errMsg = applyResult.ExtendedError != null
@@ -396,6 +553,9 @@ namespace ComSSUCast.MiracastHelper
             _receiver.StatusChanged += OnReceiverStatusChanged;
 
             MiracastReceiverSessionStartResult startResult = _session.Start();
+            LogDiag("MiracastReceiverSession.Start() result: " + startResult.Status +
+                    (startResult.ExtendedError != null ? " (" + startResult.ExtendedError.Message + ")" : ""));
+
             if (startResult.Status != MiracastReceiverSessionStartStatus.Success)
             {
                 string errMsg = startResult.ExtendedError != null
@@ -414,6 +574,9 @@ namespace ComSSUCast.MiracastHelper
             }
 
             MiracastReceiverStatus activeStatus = _receiver.GetStatus();
+            LogDiag("MiracastReceiver active status: ListeningStatus=" + activeStatus.ListeningStatus +
+                    ", WiFiStatus=" + activeStatus.WiFiStatus);
+
             EmitJson(new Dictionary<string, object>
             {
                 { "event", "status" },
@@ -445,6 +608,7 @@ namespace ComSSUCast.MiracastHelper
             try
             {
                 MiracastReceiverStatus st = sender.GetStatus();
+                LogDiag("StatusChanged: ListeningStatus=" + st.ListeningStatus + ", WiFiStatus=" + st.WiFiStatus);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "receiver_status_changed" },
@@ -465,6 +629,8 @@ namespace ComSSUCast.MiracastHelper
             {
                 Deferral deferral = args.GetDeferral();
                 MiracastReceiverConnection conn = args.Connection;
+                _activeConnection = conn;
+
                 string deviceName = (conn != null && conn.Transmitter != null && !string.IsNullOrEmpty(conn.Transmitter.Name))
                     ? conn.Transmitter.Name
                     : "Wireless Display Device";
@@ -474,11 +640,15 @@ namespace ComSSUCast.MiracastHelper
                 string pin = args.Pin ?? "";
                 string requestId = Guid.NewGuid().ToString("N");
 
+                LogDiag("ConnectionCreated: requestId=" + requestId + ", deviceName='" + deviceName +
+                        "', macAddress=" + macAddress + ", pin=" + pin);
+
                 var pending = new PendingApproval
                 {
                     RequestId = requestId,
                     DeviceName = deviceName,
                     MacAddress = macAddress,
+                    EventArgs = args,
                     Connection = conn,
                     Deferral = deferral
                 };
@@ -502,6 +672,7 @@ namespace ComSSUCast.MiracastHelper
             }
             catch (Exception ex)
             {
+                LogDiag("Error in OnConnectionCreated: " + ex);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "error" },
@@ -513,6 +684,25 @@ namespace ComSSUCast.MiracastHelper
 
         private static void ResolvePendingApproval(string requestId, bool approved, string reason)
         {
+            // Marshal onto the STA UI thread that owns MiracastReceiver, MiracastReceiverSession,
+            // and the DispatcherQueueController so WinRT Deferral.Complete() never fails across apartments.
+            if (_videoForm != null && _videoForm.IsHandleCreated && _videoForm.InvokeRequired)
+            {
+                try
+                {
+                    _videoForm.BeginInvoke(new Action(() => ResolvePendingApprovalOnUiThread(requestId, approved, reason)));
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    LogDiag("BeginInvoke for ResolvePendingApproval failed, falling back to direct call: " + ex.Message);
+                }
+            }
+            ResolvePendingApprovalOnUiThread(requestId, approved, reason);
+        }
+
+        private static void ResolvePendingApprovalOnUiThread(string requestId, bool approved, string reason)
+        {
             PendingApproval pending;
             if (!PendingApprovals.TryRemove(requestId, out pending))
             {
@@ -523,6 +713,9 @@ namespace ComSSUCast.MiracastHelper
             {
                 try { pending.TimeoutTimer.Dispose(); } catch { }
             }
+
+            LogDiag("ResolvePendingApprovalOnUiThread: requestId=" + requestId +
+                    ", deviceName='" + pending.DeviceName + "', approved=" + approved + ", reason=" + reason);
 
             try
             {
@@ -543,6 +736,10 @@ namespace ComSSUCast.MiracastHelper
                     {
                         pending.Connection.Disconnect(MiracastReceiverDisconnectReason.ConnectionNotAccepted);
                     }
+                    if (_activeConnection == pending.Connection)
+                    {
+                        _activeConnection = null;
+                    }
                     EmitJson(new Dictionary<string, object>
                     {
                         { "event", "connection_denied" },
@@ -554,6 +751,7 @@ namespace ComSSUCast.MiracastHelper
             }
             catch (Exception ex)
             {
+                LogDiag("Error in ResolvePendingApprovalOnUiThread: " + ex);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "error" },
@@ -565,7 +763,15 @@ namespace ComSSUCast.MiracastHelper
             {
                 if (pending.Deferral != null)
                 {
-                    try { pending.Deferral.Complete(); } catch { }
+                    try
+                    {
+                        pending.Deferral.Complete();
+                        LogDiag("ConnectionCreated Deferral.Complete() succeeded for requestId=" + requestId);
+                    }
+                    catch (Exception dex)
+                    {
+                        LogDiag("Error completing ConnectionCreated deferral: " + dex);
+                    }
                 }
             }
         }
@@ -578,6 +784,7 @@ namespace ComSSUCast.MiracastHelper
             try
             {
                 deferral = args.GetDeferral();
+                _activeMediaSourceArgs = args;
                 MiracastReceiverConnection conn = args.Connection;
                 _activeConnection = conn;
 
@@ -588,21 +795,78 @@ namespace ComSSUCast.MiracastHelper
                     ? conn.Transmitter.MacAddress
                     : "";
 
-                if (_videoForm != null && args.MediaSource != null)
-                {
-                    _videoForm.StartPlayback(args.MediaSource, deviceName);
-                }
+                LogDiag("MediaSourceCreated fired for deviceName='" + deviceName +
+                        "', macAddress=" + macAddress +
+                        ", hasMediaSource=" + (args.MediaSource != null));
 
-                EmitJson(new Dictionary<string, object>
+                // IMPORTANT: Attach args.MediaSource to MediaPlayer and call Play() on the STA UI thread
+                // BEFORE completing the MediaSourceCreated deferral!
+                if (_videoForm != null && _videoForm.IsHandleCreated)
                 {
-                    { "event", "media_source_created" },
-                    { "deviceName", deviceName },
-                    { "macAddress", macAddress },
-                    { "protocol", "Miracast" }
-                });
+                    Deferral capturedDeferral = deferral;
+                    deferral = null; // Ownership transferred to UI thread callback
+                    _videoForm.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            if (args.MediaSource != null)
+                            {
+                                _videoForm.StartPlaybackOnUiThread(args.MediaSource, deviceName);
+                            }
+
+                            EmitJson(new Dictionary<string, object>
+                            {
+                                { "event", "media_source_created" },
+                                { "deviceName", deviceName },
+                                { "macAddress", macAddress },
+                                { "protocol", "Miracast" }
+                            });
+                        }
+                        catch (Exception uiEx)
+                        {
+                            LogDiag("Error in MediaSourceCreated UI callback: " + uiEx);
+                            EmitJson(new Dictionary<string, object>
+                            {
+                                { "event", "error" },
+                                { "stage", "media_source_created_ui" },
+                                { "message", uiEx.Message }
+                            });
+                        }
+                        finally
+                        {
+                            if (capturedDeferral != null)
+                            {
+                                try
+                                {
+                                    capturedDeferral.Complete();
+                                    LogDiag("MediaSourceCreated Deferral.Complete() succeeded on UI thread");
+                                }
+                                catch (Exception dex)
+                                {
+                                    LogDiag("Error completing MediaSourceCreated deferral: " + dex);
+                                }
+                            }
+                        }
+                    }));
+                }
+                else
+                {
+                    if (_videoForm != null && args.MediaSource != null)
+                    {
+                        _videoForm.StartPlaybackOnUiThread(args.MediaSource, deviceName);
+                    }
+                    EmitJson(new Dictionary<string, object>
+                    {
+                        { "event", "media_source_created" },
+                        { "deviceName", deviceName },
+                        { "macAddress", macAddress },
+                        { "protocol", "Miracast" }
+                    });
+                }
             }
             catch (Exception ex)
             {
+                LogDiag("Error in OnMediaSourceCreated: " + ex);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "error" },
@@ -633,10 +897,13 @@ namespace ComSSUCast.MiracastHelper
                     ? conn.Transmitter.MacAddress
                     : "";
 
+                LogDiag("Disconnected fired for deviceName='" + deviceName + "', macAddress=" + macAddress);
+
                 if (_activeConnection == conn)
                 {
                     _activeConnection = null;
                 }
+                _activeMediaSourceArgs = null;
 
                 if (_videoForm != null)
                 {
@@ -652,6 +919,7 @@ namespace ComSSUCast.MiracastHelper
             }
             catch (Exception ex)
             {
+                LogDiag("Error in OnDisconnected: " + ex);
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "error" },
@@ -667,6 +935,7 @@ namespace ComSSUCast.MiracastHelper
             {
                 var conn = _activeConnection;
                 _activeConnection = null;
+                _activeMediaSourceArgs = null;
                 if (conn != null)
                 {
                     conn.Disconnect(MiracastReceiverDisconnectReason.DisconnectedByUser);
@@ -675,6 +944,7 @@ namespace ComSSUCast.MiracastHelper
                 {
                     _videoForm.StopPlayback();
                 }
+                LogDiag("User requested disconnect of active Miracast connection");
                 EmitJson(new Dictionary<string, object>
                 {
                     { "event", "disconnected" },
@@ -696,6 +966,7 @@ namespace ComSSUCast.MiracastHelper
                     line = line.Trim();
                     if (line.Length == 0) continue;
 
+                    LogDiag("Stdin command received: " + line);
                     string cmd = ExtractJsonString(line, "command");
                     if (cmd == "resolve_approval" || cmd == "approve" || cmd == "deny")
                     {
@@ -734,8 +1005,9 @@ namespace ComSSUCast.MiracastHelper
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                LogDiag("StdinReaderLoop exception: " + ex.Message);
             }
 
             // Parent process closed stdin or sent shutdown -> exit Application loop
@@ -766,11 +1038,14 @@ namespace ComSSUCast.MiracastHelper
 
         private static void Cleanup()
         {
+            LogDiag("Cleanup starting");
             foreach (var kv in PendingApprovals)
             {
-                ResolvePendingApproval(kv.Key, false, "shutdown");
+                ResolvePendingApprovalOnUiThread(kv.Key, false, "shutdown");
             }
             try { if (_activeConnection != null) _activeConnection.Disconnect(MiracastReceiverDisconnectReason.Finished); } catch { }
+            _activeConnection = null;
+            _activeMediaSourceArgs = null;
             try { if (_session != null) _session.Dispose(); } catch { }
             try { if (_videoForm != null) _videoForm.Dispose(); } catch { }
         }
@@ -826,7 +1101,7 @@ namespace ComSSUCast.MiracastHelper
                     .Replace("\t", "\\t");
         }
 
-        private static void EmitJson(Dictionary<string, object> fields)
+        internal static void EmitJson(Dictionary<string, object> fields)
         {
             var sb = new StringBuilder();
             sb.Append('{');
